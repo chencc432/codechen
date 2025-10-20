@@ -1,5 +1,5 @@
 package codechen
 
 func main() {
-	print("sjndkf")
+	print("sjndkf中文加测")
 }
