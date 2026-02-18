@@ -1,0 +1,104 @@
+# Frontend ConfigMap (nginx 配置)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: microservice
+data:
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        location /api {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        
+        location /health {
+            return 200 'OK';
+            add_header Content-Type text/plain;
+        }
+    }
+
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: microservice
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 5
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: frontend-config
+          items:
+          - key: nginx.conf
+            path: default.conf
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: microservice
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+
+
+
