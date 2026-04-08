@@ -1,0 +1,256 @@
+{
+  "main": {
+    "id": "2e469bc243a1e131",
+    "type": "split",
+    "children": [
+      {
+        "id": "0ccbbdee5589e906",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "46a6bbe527f695f4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "计算机网络八股.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "计算机网络八股"
+            }
+          },
+          {
+            "id": "4232b83dc68af4f8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "计算机网络八股.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "计算机网络八股"
+            },
+            "group": "db5aab3c9a4dae36"
+          },
+          {
+            "id": "64f57c53289a311b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "金山c++.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "金山c++"
+            }
+          },
+          {
+            "id": "340994da2cec2a28",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "计算机网络八股.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "计算机网络八股"
+            }
+          },
+          {
+            "id": "3ed8c252488f79a1",
+            "type": "leaf",
+            "state": {
+              "type": "image",
+              "state": {
+                "file": "Pasted image 20250302105409.png"
+              },
+              "icon": "lucide-image",
+              "title": "Pasted image 20250302105409"
+            }
+          }
+        ],
+        "currentTab": 1
+      },
+      {
+        "id": "51e1d0541bcecdb1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6731f587fb3951cc",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "计算机网络八股.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "计算机网络八股 的大纲"
+            },
+            "group": "db5aab3c9a4dae36"
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "6f14e8a6d3a74ed8",
+    "type": "split",
+    "children": [
+      {
+        "id": "34d75733f2bc78dd",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f3130e6888b7b67d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "959a3c379146da3b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "5432facf0360fc03",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "b924cef1c1c81d60",
+    "type": "split",
+    "children": [
+      {
+        "id": "b10035cf7f9f6fb7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9dc117efda530343",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "计算机网络八股.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "计算机网络八股 的反向链接列表"
+            }
+          },
+          {
+            "id": "86e092cb60d013dc",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "计算机网络八股.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "计算机网络八股 的出链列表"
+            }
+          },
+          {
+            "id": "850a5fede3e16dbb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "df9e63471afdc4fe",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "计算机网络八股.md"
+              },
+              "icon": "lucide-list",
+              "title": "计算机网络八股 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false
+    }
+  },
+  "active": "4232b83dc68af4f8",
+  "lastOpenFiles": [
+    "c++八股应急版.md",
+    "金山c++.md",
+    "计算机网络八股.md",
+    "c++stl.md",
+    "未命名.canvas",
+    "c++设计模式.md",
+    "Pasted image 20250302105409.png",
+    "2025-04-03.md",
+    "Pasted image 20250302105020.png"
+  ]
+}
