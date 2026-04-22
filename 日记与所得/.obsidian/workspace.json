@@ -1,24 +1,24 @@
 {
   "main": {
-    "id": "0de50d8685bb4d59",
+    "id": "6bde789c68eb5f99",
     "type": "split",
     "children": [
       {
-        "id": "f19310bb7330b664",
+        "id": "93a2223ed55b2913",
         "type": "tabs",
         "children": [
           {
-            "id": "3da3bdc71d350786",
+            "id": "37910f7c37ce95af",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "日记/2026-04-12.md",
+                "file": "日记/2026-04-22.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-04-12"
+              "title": "2026-04-22"
             }
           }
         ]
@@ -27,15 +27,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "fd1a5a2a578cde13",
+    "id": "d7c84a247506499c",
     "type": "split",
     "children": [
       {
-        "id": "e219ef0c6d5806db",
+        "id": "0d79f8f8b5b677d7",
         "type": "tabs",
         "children": [
           {
-            "id": "63ee761b6c3d24df",
+            "id": "cc0cfc98b73728c7",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -48,7 +48,7 @@
             }
           },
           {
-            "id": "87bdff20d973f7a6",
+            "id": "7fd60a5ec67cc6fd",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -65,7 +65,7 @@
             }
           },
           {
-            "id": "9fd3c9ff0918b5b3",
+            "id": "b7c18f65e5523a22",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -78,23 +78,23 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 300,
+    "collapsed": true
   },
   "right": {
-    "id": "e71f36d805d0342e",
+    "id": "6d424c506341b0b4",
     "type": "split",
     "children": [
       {
-        "id": "a51d8d35121eacc4",
+        "id": "89a2240b75c9edfc",
         "type": "tabs",
         "children": [
           {
-            "id": "16845bc0fb5b51ec",
+            "id": "c45b823d21dbd4f0",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "2026-04-09.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,46 +104,63 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "2026-04-09 的反向链接列表"
+              "title": "反向链接"
             }
           },
           {
-            "id": "6ef4992e954e3ce4",
+            "id": "c2562618ff025c90",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "2025-01-21.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "2025-01-21 的出链列表"
+              "title": "出链"
             }
           },
           {
-            "id": "8f8ffbf8b9f021e3",
+            "id": "cdba879e224952f5",
             "type": "leaf",
             "state": {
               "type": "tag",
               "state": {
                 "sortOrder": "frequency",
-                "useHierarchy": true
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-tags",
               "title": "标签"
             }
           },
           {
-            "id": "9ee1adf453f3c24c",
+            "id": "2b850e94e7e635c2",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-ghost",
+              "title": "all-properties"
+            }
+          },
+          {
+            "id": "9adebb914a2e2115",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-                "file": "2025-01-21.md"
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "2025-01-21 的大纲"
+              "title": "大纲"
             }
           }
         ]
@@ -155,53 +172,48 @@
   },
   "left-ribbon": {
     "hiddenItems": {
-      "bases:新建数据库": false,
       "switcher:打开快速切换": false,
       "graph:查看关系图谱": false,
       "canvas:新建白板": false,
       "daily-notes:打开/创建今天的日记": false,
       "templates:插入模板": false,
-      "command-palette:打开命令面板": false
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
     }
   },
-  "active": "3da3bdc71d350786",
+  "active": "37910f7c37ce95af",
   "lastOpenFiles": [
+    "日记/2026-04-20.md",
+    "日记/2026-04-22.md",
+    "网络文章/如何一天修复你的一生.md",
+    "日记/2026-04-17.md",
+    "网络文章",
+    "日记/2026-04-15.md",
+    "日记模板.md",
+    "日记/2026-04-14.md",
+    "计划书/毕业过渡时期计划.md",
+    "计划书",
+    "未命名 1.base",
+    "日记/把时间花在成长上而非结果上.md",
+    "日记/2025-02-12.md",
+    "日记/Pasted image 20250212004949.png",
+    "日记/2026-04-10.md",
     "日记/2026-04-11.md",
     "日记/2026-04-12.md",
-    "日记/2026-04-10.md",
     "日记/2026-04-09.md",
-    "未命名 1.base",
-    "日记模板.md",
-    "模板",
-    "日记/2025-04-04 清明节，.md",
     "日记/2026-04-08.md",
-    "未命名 1.canvas",
-    "未命名 2.base",
-    "未命名 3.base",
-    "Untitled.md",
-    "日记/2025-06-17返校.md",
-    "日记/Pasted image 20250212004949.png",
-    "日记/2025-02-02.md",
-    "未命名.base",
-    "未命名.canvas",
-    "日记/2025-04-25.md",
-    "日记/2026-04-04.md",
-    "日记/2025-01-21.md",
-    "日记/把时间花在成长上而非结果上.md",
     "日记/2026-03-22.md",
-    "计划书/毕业过渡时期计划.md",
-    "心得与经验/新入职怎么做.md",
-    "未命名 1.md",
+    "日记/2026-04-04.md",
     "日记/2025-06-26在武汉酒店.md",
-    "心得与经验",
-    "日记/2025-02-06.md",
-    "日记",
-    "计划书",
+    "日记/2025-06-17返校.md",
+    "日记/2025-04-04 清明节，.md",
     "日记/2025-05-10答辩结束.md",
+    "日记/2025-04-25.md",
     "日记/2025-04-03 小米人生建议.md",
     "日记/2025-03-24.md",
-    "日记/2025-03-18.md",
+    "日记/2025-03-16.md",
     "日记/2025-03-17.md",
-    "日记/2025-03-16.md"
+    "日记",
+    "心得与经验"
   ]
 }
