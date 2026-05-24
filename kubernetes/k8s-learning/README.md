@@ -24,6 +24,8 @@
 6. **编程扩展**：client-go、Informer、自定义控制器
 7. **平台扩展**：CRD、自定义控制器、Operator、资源设计与版本演进
 8. **存储运维**：卷、存储类、CSI、扩容、迁移、备份与恢复
+9. **工作流编排**：Argo Workflow（DAG/Steps、参数与制品、CronWorkflow、生产实践）
+10. **控制器深度**：Informer 内部、Workqueue、Reconcile、Leader Election、Finalizer 等
 
 ## 推荐学习方式
 
@@ -66,6 +68,20 @@
 4. [Informer 机制详解](./05-client-go/04-informer.md)
 5. [实战项目：自定义控制器](./05-client-go/05-controller-demo.md)
 6. [Kubernetes 自定义资源专题](./07-custom-resources/README.md)
+7. [控制器深度专题](./11-controller-deep-dive/README.md)
+
+### 路线 5：工作流与 Pipeline
+
+适合需要在 Kubernetes 上跑 CI/CD、ML Pipeline、批处理流水线的同学：
+
+1. [Argo Workflow 概述与核心概念](./10-argo-workflow/01-argo-overview.md)
+2. [安装与快速上手](./10-argo-workflow/02-installation-and-quickstart.md)
+3. [Workflow Spec 与 Template 类型详解](./10-argo-workflow/03-templates-and-spec.md)
+4. [DAG、Steps 与控制流](./10-argo-workflow/04-dag-steps-and-controlflow.md)
+5. [参数、制品与数据传递](./10-argo-workflow/05-parameters-and-artifacts.md)
+6. [WorkflowTemplate 与 CronWorkflow](./10-argo-workflow/06-workflowtemplate-and-cron.md)
+7. [架构与控制器原理](./10-argo-workflow/07-architecture-and-controller.md)
+8. [生产实践与故障排查](./10-argo-workflow/08-production-and-troubleshooting.md)
 
 ### 路线 4：平台与存储专题
 
@@ -173,6 +189,34 @@
 5. [节点维护、调度控制与存储相关命令](./09-ops-command-handbook/04-node-scheduling-and-storage.md)
 6. [高频运维命令组合与值班速查清单](./09-ops-command-handbook/05-practical-command-combinations.md)
 
+### 第十部分：Argo Workflow 专题
+
+这部分解决的问题是："如何在 Kubernetes 上跑出一条可维护、可调试、可上生产的工作流？覆盖 CI/CD、ML Pipeline、批处理等真实场景。"
+
+1. [Argo Workflow 专题总览](./10-argo-workflow/README.md)
+2. [概述与核心概念](./10-argo-workflow/01-argo-overview.md)
+3. [安装与快速上手](./10-argo-workflow/02-installation-and-quickstart.md)
+4. [Workflow Spec 与 Template 类型详解](./10-argo-workflow/03-templates-and-spec.md)
+5. [DAG、Steps 与控制流](./10-argo-workflow/04-dag-steps-and-controlflow.md)
+6. [参数、制品与数据传递](./10-argo-workflow/05-parameters-and-artifacts.md)
+7. [WorkflowTemplate、ClusterWorkflowTemplate 与 CronWorkflow](./10-argo-workflow/06-workflowtemplate-and-cron.md)
+8. [架构与控制器原理](./10-argo-workflow/07-architecture-and-controller.md)
+9. [生产实践与故障排查](./10-argo-workflow/08-production-and-troubleshooting.md)
+
+### 第十一部分：控制器深度专题
+
+这部分解决的问题是："client-go 的 Informer 内部到底怎么转？Workqueue 是怎么去重和退避的？Reconcile 函数怎么写才幂等？Finalizer / Leader Election / status / Conditions 在生产里到底怎么落地？"
+
+1. [控制器深度专题总览](./11-controller-deep-dive/README.md)
+2. [控制器模式与声明式 API 的本质](./11-controller-deep-dive/01-controller-pattern.md)
+3. [Informer 内部机制详解](./11-controller-deep-dive/02-informer-internals.md)
+4. [WorkQueue 与限速器](./11-controller-deep-dive/03-workqueue.md)
+5. [Reconcile 函数的设计要点](./11-controller-deep-dive/04-reconcile-design.md)
+6. [Leader Election 与 Finalizer](./11-controller-deep-dive/05-leader-election-and-finalizers.md)
+7. [Status 子资源与 Conditions 设计](./11-controller-deep-dive/06-status-and-conditions.md)
+8. [controller-runtime 与原生 client-go 对比](./11-controller-deep-dive/07-controller-runtime-vs-clientgo.md)
+9. [最佳实践与常见坑](./11-controller-deep-dive/08-best-practices-and-pitfalls.md)
+
 ## 当前文档完善状态
 
 为了让你对这套文档的成熟度有预期，下面给出当前状态说明：
@@ -194,6 +238,8 @@
 | 自定义资源专题 | `已补齐骨架` | 已新增完整专题结构，覆盖 CRD、控制器、版本设计 |
 | 存储与运维专题 | `已补齐骨架` | 已新增专题结构，覆盖存储体系与生产运维动作 |
 | 运维指令专题 | `已补齐骨架` | 已新增运维命令专题，覆盖巡检、发布、排障、节点、存储和值班速查 |
+| Argo Workflow 专题 | `已完善` | 新增完整专题，覆盖概念、Spec、DAG、参数制品、模板复用、原理、生产 |
+| 控制器深度专题 | `已完善` | 新增完整专题，覆盖 Informer 内部、Workqueue、Reconcile、Leader、Finalizer、cr vs client-go |
 
 ## 阅读时建议重点关注的东西
 
@@ -221,6 +267,7 @@
 第 3 周：kubectl / YAML / 运维 / 故障排查
 第 4 周：网络 / 调度 / 安全 / client-go / 项目实战
 第 5 周：CRD / Operator / 存储运维专题
+第 6 周：Argo Workflow / 控制器深度专题
 ```
 
 如果你时间更碎片化，也可以按主题拆开学：
