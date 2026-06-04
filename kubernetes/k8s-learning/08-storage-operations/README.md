@@ -35,6 +35,7 @@ Kubernetes 学到后面，真正最容易让人踩坑、最影响生产稳定性
 5. [备份恢复与演练手册](./05-backup-recovery-drills.md)
 6. [数据库、中间件、日志系统三类场景的存储选型与运维差异](./06-storage-by-workload-scenarios.md)
 7. [PVC/PV/CSI 故障案例库与排障剧本](./07-pvc-pv-csi-failure-cases.md)
+8. [主流持久化存储方案详解](./08-mainstream-persistent-storage-guide.md)
 
 ## 和现有文档的关系
 
@@ -81,6 +82,7 @@ Kubernetes 学到后面，真正最容易让人踩坑、最影响生产稳定性
 5. [备份恢复与演练手册](./05-backup-recovery-drills.md)
 6. [数据库、中间件、日志系统三类场景的存储选型与运维差异](./06-storage-by-workload-scenarios.md)
 7. [PVC/PV/CSI 故障案例库与排障剧本](./07-pvc-pv-csi-failure-cases.md)
+8. [主流持久化存储方案详解](./08-mainstream-persistent-storage-guide.md)
 
 ## 适合谁读
 
