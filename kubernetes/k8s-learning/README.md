@@ -26,6 +26,7 @@
 8. **存储运维**：卷、存储类、CSI、扩容、迁移、备份与恢复
 9. **工作流编排**：Argo Workflow（DAG/Steps、参数与制品、CronWorkflow、生产实践）
 10. **控制器深度**：Informer 内部、Workqueue、Reconcile、Leader Election、Finalizer 等
+11. **网络工程**：企业网络架构全景、VPC 与内网互通、公网暴露、办公网与堡垒机、网络转发与排障
 
 ## 推荐学习方式
 
@@ -217,6 +218,20 @@
 8. [controller-runtime 与原生 client-go 对比](./11-controller-deep-dive/07-controller-runtime-vs-clientgo.md)
 9. [最佳实践与常见坑](./11-controller-deep-dive/08-best-practices-and-pitfalls.md)
 
+### 第十二部分：网络工程专题
+
+这部分解决的问题是："K8s 集群在真实生产环境中是如何与内网、公网、办公网、堡垒机等网络互通的？iptables、SSH 隧道、端口转发、NAT 这些技术在网络链路中各自扮演什么角色？"
+
+1. [网络工程专题总览](./12-network-engineering/README.md)
+2. [企业网络架构全景](./12-network-engineering/01-network-architecture-overview.md)
+3. [集群内部网络深度解析](./12-network-engineering/02-cluster-internal-network.md)
+4. [内网与 VPC 网络](./12-network-engineering/03-vpc-and-intranet.md)
+5. [公网访问与暴露](./12-network-engineering/04-public-network-access.md)
+6. [办公网络与堡垒机](./12-network-engineering/05-office-and-bastion-network.md)
+7. [网络转发与代理](./12-network-engineering/06-network-forwarding.md)
+8. [多网络互通全景方案](./12-network-engineering/07-network-interconnection.md)
+9. [网络排障实战](./12-network-engineering/08-network-troubleshooting.md)
+
 ## 当前文档完善状态
 
 为了让你对这套文档的成熟度有预期，下面给出当前状态说明：
@@ -240,6 +255,7 @@
 | 运维指令专题 | `已补齐骨架` | 已新增运维命令专题，覆盖巡检、发布、排障、节点、存储和值班速查 |
 | Argo Workflow 专题 | `已完善` | 新增完整专题，覆盖概念、Spec、DAG、参数制品、模板复用、原理、生产 |
 | 控制器深度专题 | `已完善` | 新增完整专题，覆盖 Informer 内部、Workqueue、Reconcile、Leader、Finalizer、cr vs client-go |
+| 网络工程专题 | `已完善` | 新增完整专题，覆盖企业网络架构、VPC/内网/公网/办公网/堡垒机互通、网络转发与排障 |
 
 ## 阅读时建议重点关注的东西
 
@@ -268,6 +284,7 @@
 第 4 周：网络 / 调度 / 安全 / client-go / 项目实战
 第 5 周：CRD / Operator / 存储运维专题
 第 6 周：Argo Workflow / 控制器深度专题
+第 7 周：网络工程专题（企业网络架构、VPC、公网暴露、堡垒机、网络转发与排障）
 ```
 
 如果你时间更碎片化，也可以按主题拆开学：
