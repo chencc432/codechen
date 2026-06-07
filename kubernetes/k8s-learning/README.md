@@ -84,6 +84,19 @@
 7. [架构与控制器原理](./10-argo-workflow/07-architecture-and-controller.md)
 8. [生产实践与故障排查](./10-argo-workflow/08-production-and-troubleshooting.md)
 
+### 路线 6：GitOps 与渐进发布
+
+适合需要搭建完整 GitOps + CI/CD + 渐进发布体系的同学：
+
+1. [Argo 全家桶全景概览](./13-argo-suite/01-argo-ecosystem-overview.md)
+2. [Argo CD 核心概念与原理](./13-argo-suite/02-argocd-core-concepts.md)
+3. [Argo CD 安装与快速上手](./13-argo-suite/03-argocd-installation-and-quickstart.md)
+4. [Argo CD 进阶](./13-argo-suite/04-argocd-advanced.md)
+5. [Argo Rollouts：金丝雀与蓝绿部署](./13-argo-suite/05-argo-rollouts-core.md)
+6. [Argo Events：事件监听与自动触发](./13-argo-suite/06-argo-events-core.md)
+7. [全家桶联动实战](./13-argo-suite/07-argo-suite-integration.md)
+8. [生产最佳实践与避坑](./13-argo-suite/08-production-best-practices.md)
+
 ### 路线 4：平台与存储专题
 
 适合希望把 Kubernetes 用到“平台能力”和“生产存储运维”层面的同学：
@@ -218,6 +231,20 @@
 8. [controller-runtime 与原生 client-go 对比](./11-controller-deep-dive/07-controller-runtime-vs-clientgo.md)
 9. [最佳实践与常见坑](./11-controller-deep-dive/08-best-practices-and-pitfalls.md)
 
+### 第十三部分：Argo 全家桶专题
+
+这部分解决的问题是："如何用 Argo CD、Argo Workflows、Argo Rollouts、Argo Events 四件套搭建完整的 GitOps + CI/CD + 渐进发布 + 事件驱动体系？"
+
+1. [Argo 全家桶专题总览](./13-argo-suite/README.md)
+2. [全家桶全景概览](./13-argo-suite/01-argo-ecosystem-overview.md)
+3. [Argo CD 核心概念与原理](./13-argo-suite/02-argocd-core-concepts.md)
+4. [Argo CD 安装与快速上手](./13-argo-suite/03-argocd-installation-and-quickstart.md)
+5. [Argo CD 进阶：多集群、App of Apps、Secrets](./13-argo-suite/04-argocd-advanced.md)
+6. [Argo Rollouts：金丝雀与蓝绿部署](./13-argo-suite/05-argo-rollouts-core.md)
+7. [Argo Events：事件监听与自动触发](./13-argo-suite/06-argo-events-core.md)
+8. [全家桶联动实战](./13-argo-suite/07-argo-suite-integration.md)
+9. [生产最佳实践与避坑](./13-argo-suite/08-production-best-practices.md)
+
 ### 第十二部分：网络工程专题
 
 这部分解决的问题是："K8s 集群在真实生产环境中是如何与内网、公网、办公网、堡垒机等网络互通的？iptables、SSH 隧道、端口转发、NAT 这些技术在网络链路中各自扮演什么角色？"
@@ -256,6 +283,7 @@
 | Argo Workflow 专题 | `已完善` | 新增完整专题，覆盖概念、Spec、DAG、参数制品、模板复用、原理、生产 |
 | 控制器深度专题 | `已完善` | 新增完整专题，覆盖 Informer 内部、Workqueue、Reconcile、Leader、Finalizer、cr vs client-go |
 | 网络工程专题 | `已完善` | 新增完整专题，覆盖企业网络架构、VPC/内网/公网/办公网/堡垒机互通、网络转发与排障 |
+| Argo 全家桶专题 | `已完善` | 新增完整专题，覆盖 Argo CD/Rollouts/Events 核心概念、安装实战、全家桶联动、生产最佳实践 |
 
 ## 阅读时建议重点关注的东西
 
@@ -285,6 +313,7 @@
 第 5 周：CRD / Operator / 存储运维专题
 第 6 周：Argo Workflow / 控制器深度专题
 第 7 周：网络工程专题（企业网络架构、VPC、公网暴露、堡垒机、网络转发与排障）
+第 8 周：Argo 全家桶专题（Argo CD、Argo Rollouts、Argo Events、全家桶联动）
 ```
 
 如果你时间更碎片化，也可以按主题拆开学：
