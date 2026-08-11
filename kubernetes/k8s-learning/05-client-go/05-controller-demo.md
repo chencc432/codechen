@@ -1,4 +1,4 @@
-# 🎮 实战项目：自定义控制器
+# 实战项目：自定义控制器
 
 ## 什么是控制器？
 
@@ -79,6 +79,13 @@ Kubernetes 自带了很多控制器，它们都运行在 `kube-controller-manage
 - 足够简单，适合入门
 - 包含控制器的所有核心组件
 - 展示完整的 Watch → Queue → Handle 流程
+
+### 先记住两个设计原则
+
+1. **电平触发（level-triggered）**：事件只是“请再对一次账”的信号。丢事件不可怕，怕的是 Reconcile 不幂等。
+2. **幂等**：对同一 key 处理 1 次和 100 次，终态一致。本例靠“已有注解则跳过”实现。
+
+因此 Handler 里不要写“只在 ADDED 时干什么”的边沿逻辑；一律入队，在 `syncHandler` 里读**当前**状态再决定。
 
 ---
 
@@ -216,6 +223,7 @@ import (
     "k8s.io/client-go/kubernetes"                 // Clientset
     corelisters "k8s.io/client-go/listers/core/v1" // Pod Lister
     "k8s.io/client-go/tools/cache"                // 缓存工具
+    "k8s.io/client-go/util/retry"                 // 冲突重试
     "k8s.io/client-go/util/workqueue"             // 工作队列
     "k8s.io/klog/v2"                              // 日志
 )
@@ -551,42 +559,39 @@ func (c *Controller) syncHandler(key string) error {
 // 这是实际修改 Pod 的函数
 
 func (c *Controller) addAnnotation(pod *corev1.Pod) error {
-    // ----------------------------------------
-    // 重要：创建副本！
-    // ----------------------------------------
-    // Lister 返回的对象是缓存中的引用
-    // 如果直接修改，会污染缓存
-    // 必须使用 DeepCopy() 创建副本
-    podCopy := pod.DeepCopy()
-    
-    // 初始化 Annotations map（如果为空）
-    if podCopy.Annotations == nil {
-        podCopy.Annotations = make(map[string]string)
-    }
-    
-    // 添加注解，值是当前时间
-    podCopy.Annotations[AnnotationKey] = time.Now().Format(time.RFC3339)
+    // Update 容易 409 Conflict：用 RetryOnConflict 在函数内重读再写
+    // 队列级重试（AddRateLimited）仍然保留，用于其它瞬时错误
+    return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+        // 每次重试都重新 Get，拿到最新 resourceVersion
+        fresh, err := c.clientset.CoreV1().Pods(pod.Namespace).Get(
+            context.TODO(), pod.Name, metav1.GetOptions{},
+        )
+        if err != nil {
+            return err
+        }
+        if fresh.Annotations != nil {
+            if _, ok := fresh.Annotations[AnnotationKey]; ok {
+                return nil // 已处理，幂等返回
+            }
+        }
 
-    // ----------------------------------------
-    // 调用 API 更新 Pod
-    // ----------------------------------------
-    // 注意：这里使用 Clientset 而不是 Lister
-    // Lister 只能读，Clientset 才能写
-    _, err := c.clientset.CoreV1().Pods(pod.Namespace).Update(
-        context.TODO(),
-        podCopy,
-        metav1.UpdateOptions{},
-    )
-    
-    if err != nil {
-        // 更新失败，返回错误触发重试
-        return fmt.Errorf("更新 Pod %s/%s 失败: %v", pod.Namespace, pod.Name, err)
-    }
-    
-    klog.Infof("🎉 成功为 Pod %s/%s 添加注解", pod.Namespace, pod.Name)
-    return nil
+        podCopy := fresh.DeepCopy()
+        if podCopy.Annotations == nil {
+            podCopy.Annotations = map[string]string{}
+        }
+        podCopy.Annotations[AnnotationKey] = time.Now().Format(time.RFC3339)
+
+        _, err = c.clientset.CoreV1().Pods(pod.Namespace).Update(
+            context.TODO(),
+            podCopy,
+            metav1.UpdateOptions{},
+        )
+        return err
+    })
 }
 ```
+
+> 导入：`"k8s.io/client-go/util/retry"`。Lister 的对象只用于判断；真正写入前以 Get/重试循环里的对象为准，并始终 `DeepCopy`。
 
 ### main.go
 
@@ -882,455 +887,79 @@ minikube image load pod-annotator:latest
 kubectl apply -f deployment.yaml
 ```
 
-## 扩展建议
+## 把示例补强到更接近生产
 
-1. **添加 Metrics**：暴露 Prometheus 指标
-2. **Leader Election**：多副本时使用 Leader Election
-3. **Webhook**：使用 Admission Webhook 实现更强大的控制
-4. **自定义资源**：使用 CRD 扩展功能
+下面几项不必一次写进第一版，但上线前应有意识补齐。
 
----
-
-# 📚 附录：自定义资源 (CRD) 详解
-
-## 什么是自定义资源？
-
-### 问题场景
-
-假设你要在 Kubernetes 中管理一个 MySQL 集群，你需要定义：
-- 主库和从库的配置
-- 备份策略
-- 监控指标
-
-但 Kubernetes 内置的资源（Pod、Deployment、Service）不能直接表达这些概念。
-
-**传统做法**：用 ConfigMap 存配置 + 多个 Deployment + 一堆脚本
-
-**问题**：
-- 配置分散，难以管理
-- 没有版本控制
-- 缺乏 Kubernetes 原生体验（kubectl 不能直接操作）
-
-### CRD 的解决方案
-
-**自定义资源定义 (Custom Resource Definition, CRD)** 允许你扩展 Kubernetes API，定义自己的资源类型。
-
-```yaml
-# 你可以这样定义一个 MySQL 集群
-apiVersion: mysql.example.com/v1
-kind: MySQLCluster
-metadata:
-  name: my-db
-spec:
-  replicas: 3
-  version: "8.0"
-  storage: 100Gi
-  backup:
-    enabled: true
-    schedule: "0 2 * * *"
-```
-
-使用 `kubectl` 就能管理：
-
-```bash
-kubectl get mysqlclusters
-kubectl describe mysqlcluster my-db
-kubectl delete mysqlcluster my-db
-```
-
----
-
-## CRD 的核心概念
-
-### 1️⃣ 资源 vs 资源定义
-
-| 概念 | 说明 | 类比 |
-|------|------|------|
-| **CRD** (Custom Resource Definition) | 定义资源的"模板/规范" | 表的结构定义 (DDL) |
-| **CR** (Custom Resource) | 基于 CRD 创建的实例 | 表中的数据行 |
-
-```
-CRD (定义)                          CR (实例)
-┌─────────────────────┐            ┌─────────────────────┐
-│ kind: MySQLCluster  │    创建    │ kind: MySQLCluster  │
-│ spec:               │ ────────> │ name: my-db         │
-│   replicas: int     │            │ replicas: 3         │
-│   version: string   │            │ version: "8.0"      │
-│   ...               │            │ ...                 │
-└─────────────────────┘            └─────────────────────┘
-    (类比：表结构)                      (类比：表数据)
-```
-
-### 2️⃣ CRD 定义示例
-
-```yaml
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  # CRD 名称格式：<plural>.<group>
-  name: mysqlclusters.mysql.example.com
-spec:
-  # API 组名，会出现在 apiVersion 中
-  group: mysql.example.com
-  
-  # 资源名称（各种形式）
-  names:
-    kind: MySQLCluster         # 单数，首字母大写
-    plural: mysqlclusters      # 复数，用于 URL
-    singular: mysqlcluster     # 单数，用于 kubectl
-    shortNames:                # 缩写
-      - mysql
-      - mc
-  
-  # 作用域：Namespaced（命名空间级）或 Cluster（集群级）
-  scope: Namespaced
-  
-  # 版本定义
-  versions:
-    - name: v1
-      served: true      # 是否通过 API 提供服务
-      storage: true     # 是否用于存储（只能有一个 true）
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              properties:
-                replicas:
-                  type: integer
-                  minimum: 1
-                  maximum: 10
-                version:
-                  type: string
-                  enum: ["5.7", "8.0"]
-                storage:
-                  type: string
-                  pattern: '^[0-9]+Gi$'
-```
-
-### 3️⃣ 创建自定义资源实例
-
-```yaml
-# 应用 CRD 后，就可以创建 MySQLCluster 实例了
-apiVersion: mysql.example.com/v1
-kind: MySQLCluster
-metadata:
-  name: production-db
-  namespace: default
-spec:
-  replicas: 3
-  version: "8.0"
-  storage: "100Gi"
-```
-
----
-
-## CRD + Controller = Operator
-
-**单独的 CRD 只是数据存储**，没有任何行为。
-
-要让 CRD 真正"工作"，需要配合 **自定义控制器**：
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Operator 模式                                 │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                       │
-│     用户                    API Server                控制器          │
-│       │                         │                        │           │
-│       │  创建 MySQLCluster      │                        │           │
-│       │───────────────────────>│                        │           │
-│       │                         │                        │           │
-│       │                         │  Watch 事件            │           │
-│       │                         │───────────────────────>│           │
-│       │                         │                        │           │
-│       │                         │                        │  执行操作  │
-│       │                         │                        │  ┌──────┐ │
-│       │                         │                        │  │创建  │ │
-│       │                         │                        │  │主库  │ │
-│       │                         │                        │  │Pod   │ │
-│       │                         │                        │  └──────┘ │
-│       │                         │                        │  ┌──────┐ │
-│       │                         │                        │  │创建  │ │
-│       │                         │                        │  │从库  │ │
-│       │                         │                        │  │Pod   │ │
-│       │                         │                        │  └──────┘ │
-│       │                         │                        │  ┌──────┐ │
-│       │                         │                        │  │创建  │ │
-│       │                         │                        │  │Service│ │
-│       │                         │                        │  └──────┘ │
-│       │                         │                        │           │
-│       │                         │  更新 Status            │           │
-│       │                         │<───────────────────────│           │
-│       │                         │                        │           │
-│                                                                       │
-│   用户只需要声明"我要一个 3 副本的 MySQL 集群"                         │
-│   控制器负责创建所有必要的资源并维护状态                               │
-│                                                                       │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Operator = CRD + 自定义控制器**
-
----
-
-## CRD 的功能和特性
-
-### 1️⃣ Schema 验证
-
-```yaml
-# CRD 可以定义字段验证规则
-schema:
-  openAPIV3Schema:
-    type: object
-    required:         # 必填字段
-      - spec
-    properties:
-      spec:
-        type: object
-        properties:
-          replicas:
-            type: integer
-            minimum: 1      # 最小值
-            maximum: 10     # 最大值
-            default: 1      # 默认值
-          version:
-            type: string
-            enum:           # 枚举值
-              - "5.7"
-              - "8.0"
-```
-
-### 2️⃣ Status 子资源
-
-```yaml
-# 可以分离 spec（期望状态）和 status（实际状态）
-spec:
-  versions:
-    - name: v1
-      subresources:
-        status: {}    # 启用 status 子资源
-```
-
-这样：
-- 用户只能修改 `spec`
-- 控制器只能修改 `status`
-- 两者职责分离，更安全
-
-```yaml
-apiVersion: mysql.example.com/v1
-kind: MySQLCluster
-metadata:
-  name: my-db
-spec:           # 用户定义的期望状态
-  replicas: 3
-status:         # 控制器更新的实际状态
-  readyReplicas: 2
-  phase: Provisioning
-  conditions:
-    - type: Ready
-      status: "False"
-      message: "等待从库同步"
-```
-
-### 3️⃣ 打印列（Printer Columns）
-
-```yaml
-# 定义 kubectl get 显示的列
-spec:
-  versions:
-    - name: v1
-      additionalPrinterColumns:
-        - name: Replicas
-          type: integer
-          jsonPath: .spec.replicas
-        - name: Ready
-          type: integer
-          jsonPath: .status.readyReplicas
-        - name: Age
-          type: date
-          jsonPath: .metadata.creationTimestamp
-```
-
-效果：
-```bash
-$ kubectl get mysqlclusters
-NAME    REPLICAS   READY   AGE
-my-db   3          2       5m
-```
-
-### 4️⃣ 版本转换
-
-```yaml
-# 可以定义多个版本，Kubernetes 自动转换
-versions:
-  - name: v1
-    served: true
-    storage: true
-  - name: v2beta1
-    served: true
-    storage: false
-```
-
----
-
-## CRD 依赖的组件
-
-要让 CRD 工作，涉及以下组件：
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                          CRD 生态系统                                   │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                     Kubernetes API Server                        │   │
-│  │  ┌─────────────────────────────────────────────────────────┐    │   │
-│  │  │              API Extension Server                        │    │   │
-│  │  │  • 处理 CRD 的注册和管理                                 │    │   │
-│  │  │  • 提供动态 API 端点                                     │    │   │
-│  │  │  • 执行 Schema 验证                                      │    │   │
-│  │  └─────────────────────────────────────────────────────────┘    │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                    │                                    │
-│                                    │ 存储                               │
-│                                    ▼                                    │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                           etcd                                   │   │
-│  │  • 存储 CRD 定义                                                 │   │
-│  │  • 存储 CR 实例数据                                              │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    自定义控制器 (你开发的)                        │   │
-│  │  • Informer: 监听 CR 变化                                        │   │
-│  │  • Lister: 从缓存查询 CR                                         │   │
-│  │  • WorkQueue: 任务队列                                           │   │
-│  │  • SyncHandler: 业务逻辑                                         │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    可选组件                                       │   │
-│  │  • Admission Webhook: 自定义验证和修改                           │   │
-│  │  • Conversion Webhook: 版本转换                                  │   │
-│  │  • Controller Runtime: 简化开发的框架                            │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                          │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-### 核心依赖
-
-| 组件 | 作用 | 是否必须 |
-|------|------|----------|
-| **API Server** | 注册和提供 CRD API | ✅ 是 |
-| **etcd** | 存储 CRD 和 CR 数据 | ✅ 是 |
-| **自定义控制器** | 实现业务逻辑 | ⚠️ 看需求 |
-| **client-go** | 开发控制器的库 | ✅ 开发时必须 |
-
-### 可选增强
-
-| 组件 | 作用 |
-|------|------|
-| **Admission Webhook** | 在资源创建/修改前做验证或修改 |
-| **Conversion Webhook** | 多版本 CRD 之间的转换 |
-| **Controller Runtime** | 简化控制器开发的高级框架 |
-| **Kubebuilder** | CRD + 控制器的脚手架工具 |
-| **Operator SDK** | Red Hat 的 Operator 开发框架 |
-
----
-
-## 开发 CRD 控制器的工具选择
-
-### 方式 1：纯 client-go（本章方法）
-
-```
-优点：完全掌控，理解底层原理
-缺点：代码量大，重复代码多
-适合：学习、简单场景
-```
-
-### 方式 2：Controller Runtime
+### 1. UpdateFunc 跳过无意义更新
 
 ```go
-// 更简洁的 API
-mgr, _ := ctrl.NewManager(...)
-ctrl.NewControllerManagedBy(mgr).
-    For(&MySQLCluster{}).
-    Complete(&MySQLReconciler{})
+UpdateFunc: func(oldObj, newObj interface{}) {
+    oldPod := oldObj.(*corev1.Pod)
+    newPod := newObj.(*corev1.Pod)
+    if oldPod.ResourceVersion == newPod.ResourceVersion {
+        return // resync 触发的“假更新”
+    }
+    controller.enqueuePod(newPod)
+},
 ```
 
-```
-优点：代码简洁，社区标准
-缺点：需要额外学习
-适合：生产环境
-```
+### 2. 打 Event
 
-### 方式 3：Kubebuilder（推荐）
+在 `addAnnotation` 成功/失败后：
 
-```bash
-# 一键生成项目骨架
-kubebuilder init --domain example.com
-kubebuilder create api --group mysql --version v1 --kind MySQLCluster
+```go
+c.recorder.Event(pod, corev1.EventTypeNormal, "Annotated", "added processing annotation")
+c.recorder.Eventf(pod, corev1.EventTypeWarning, "AnnotateFailed", "update failed: %v", err)
 ```
 
-```
-优点：自动生成代码、测试、部署文件
-缺点：生成的代码需要理解
-适合：快速开发、生产环境
-```
+构造方式见 [常用机制与工具包](./07-common-mechanisms.md)。
 
----
+### 3. 错误分类
 
-## 总结
+| 错误 | 建议 |
+|------|------|
+| NotFound | 返回 nil，不必重试 |
+| Conflict | `RetryOnConflict` 或返回 error 让队列限速重试 |
+| Forbidden / Invalid | 打 Warning Event，Forget，避免死循环打爆 API |
+| 超时 / 5xx | 返回 error，`AddRateLimited` |
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    控制器和 CRD 知识图谱                             │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                       │
-│  基础知识                                                            │
-│  ├── 控制器模式（Control Loop）                                      │
-│  ├── Informer（Watch + Cache）                                       │
-│  ├── WorkQueue（去重 + 限速 + 重试）                                 │
-│  └── Lister（本地缓存查询）                                          │
-│                                                                       │
-│  进阶知识                                                            │
-│  ├── CRD（自定义资源定义）                                           │
-│  ├── CR（自定义资源实例）                                            │
-│  ├── Operator = CRD + Controller                                     │
-│  └── Admission Webhook                                               │
-│                                                                       │
-│  开发工具                                                            │
-│  ├── client-go（底层库）                                             │
-│  ├── controller-runtime（中级框架）                                  │
-│  └── kubebuilder / operator-sdk（脚手架）                            │
-│                                                                       │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### 4. 启动顺序 checklist
 
----
+1. 造 `rest.Config`（QPS、UserAgent）
+2. 造 Clientset
+3. 造 SharedInformerFactory，**先** `AddEventHandler` / 注册索引
+4. `factory.Start(stopCh)`
+5. `WaitForCacheSync`
+6. 启动 workers
+7. 多副本时外包 Leader Election
 
-## 恭喜！🎉
+### 5. 单测思路
 
-你已经完成了 client-go 的学习！现在你可以：
+用 `fake.NewSimpleClientset` 塞入 Pod，直接调 `syncHandler("default/p")`，断言注解存在。Informer 集成可用更重的 envtest；本模块机制说明见 [07](./07-common-mechanisms.md)，排障清单见 [08](./08-debugging-and-pitfalls.md)。
 
-- ✅ 使用 Clientset 进行 CRUD 操作
-- ✅ 使用 Informer 高效监听资源变化
-- ✅ 使用 WorkQueue 实现控制器模式
-- ✅ 开发自己的 Kubernetes 控制器
-- ✅ 理解 CRD 和 Operator 的概念
+## 扩展建议
 
-### 推荐的下一步学习
 
-1. **实践**：尝试修改本章的代码，添加更多功能
-2. **Kubebuilder**：学习使用脚手架快速开发
-3. **真实 Operator**：阅读 etcd-operator、mysql-operator 等开源项目的代码
+把本章控制器补强到更接近生产形态时，优先加这些（机制说明见后续章节）：
+
+1. **EventRecorder**：`kubectl describe` 可见的 Normal/Warning 事件 — [常用机制](./07-common-mechanisms.md)
+2. **Leader Election**：多副本只跑一个活跃循环 — 同上，深度见 [11-05](../11-controller-deep-dive/05-leader-election-and-finalizers.md)
+3. **RetryOnConflict / DeepCopy**：写路径别污染 Informer 缓存 — [CRUD 写路径](./03-crud-operations.md)
+4. **Metrics / healthz**：就绪探针与队列深度
+5. **CRD + Operator**：把「注解 Pod」升级成领域对象 — 整专题在 [自定义资源](../07-custom-resources/README.md)
+
+## 你已经串起来的能力
+
+- Clientset 读写作
+- Informer 缓存与事件
+- WorkQueue 去重、限速、重试
+- 标准控制循环（enqueue → syncHandler）
 
 ## 下一步
 
-返回 [课程主页](../README.md) 查看更多内容。
-
-
-
+- [Discovery 与 Dynamic Client](./06-discovery-and-dynamic.md)
+- [常用机制与工具包](./07-common-mechanisms.md)
+- [排障与生产清单](./08-debugging-and-pitfalls.md)
+- [控制器深度专题](../11-controller-deep-dive/README.md)
+- [模块总览](./README.md)

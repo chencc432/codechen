@@ -434,6 +434,7 @@ kubectl delete namespace quota-test
 
 ## 下一步
 
+- [ServiceAccount 与 RBAC 权限控制](./09-serviceaccount-rbac.md)
 - [StatefulSet - 有状态应用](./07-statefulset.md)
 
 

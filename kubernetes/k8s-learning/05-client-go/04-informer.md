@@ -1,20 +1,49 @@
-# 🔄 Informer 机制详解
+# Informer 机制详解
+
+Informer 是 client-go 里**长期运行程序**的核心机制：官方控制器几乎都建立在 SharedInformer + WorkQueue 之上。
+
+本章顺序：List/Watch 地基 → 内部组件 → 用法与 Lister → WorkQueue → Metadata/Dynamic Informer → 实践与坑。更底层见 [Informer 内部机制](../11-controller-deep-dive/02-informer-internals.md)。
+
+## List / Watch / resourceVersion：Informer 的地基
+
+### resourceVersion（RV）
+
+每次 List/Get/Watch 响应都带着 RV，它是一致性游标：
+
+- List 返回快照 + RV
+- Watch 从某个 RV 之后推增量
+- Update 用对象自带的 RV 做乐观锁
+
+RV 只能比相等/不等，不要当整数比大小。
+
+### 裸 Watch 为什么不够
+
+直接 `Watch()` 还要自己处理：断开重连、`410 Gone` 后重新 List、本地缓存、多消费者共享、BOOKMARK/ERROR。Informer 的 Reflector 把这些做成标准循环。
+
+| 能力 | 裸 Watch | Informer |
+|------|----------|----------|
+| 重连与 410 | 自己写 | Reflector 内置 |
+| 本地缓存 | 无 | Indexer |
+| 类型化查询 | 无 | Lister |
+| 多消费者共享 | 难 | SharedInformer |
+| 定期对账 | 无 | resync |
+
+---
 
 ## 什么是 Informer？
 
-**Informer 是 client-go 中最核心的组件之一**，它是一个智能的"资源监听器"，能够：
+**Informer 是带本地缓存的资源同步器**，它会：
 
 1. **监控 Kubernetes 资源的变化**（Pod 创建了、Service 删除了等）
 2. **在本地维护一份资源的缓存副本**（不用每次都去问 API Server）
 3. **当资源发生变化时，通知你的代码做出响应**
 
-### 生活化比喻 🏠
+### 生活化比喻
 
 想象你是一个快递站的管理员：
 
-- **没有 Informer 的情况**：每次想知道有没有新快递，你都要打电话问总部。一天打100次电话，总部烦死了，你也累死了。
-
-- **有 Informer 的情况**：总部给你装了一个实时显示屏（本地缓存），快递状态实时同步。有新快递到了，显示屏自动更新并响铃通知你（事件回调）。你想查快递？直接看屏幕，不用打电话！
+- **没有 Informer**：每次查件都打电话问总部——总部烦、你也累、还不够实时
+- **有 Informer**：总部给你一块实时屏（本地缓存），有变化就响铃（回调）；查件看屏幕即可
 
 ---
 
@@ -509,6 +538,8 @@ factory := informers.NewSharedInformerFactoryWithOptions(
 )
 ```
 
+过滤越早越好：少 List、少 Watch、少占内存。**一个 factory 的 TweakListOptions 会作用到它创建的所有 Informer**，需要不同选择器时建多个 factory。
+
 ## SharedInformerFactory
 
 ### 多资源 Informer
@@ -560,6 +591,56 @@ func setupInformers(clientset *kubernetes.Clientset) {
     factory.WaitForCacheSync(stopCh)
 }
 ```
+
+### Shared 的含义
+
+对同一 factory、同一资源，多次 `Pods().Informer()` 返回**同一个** SharedIndexInformer：一条 List/Watch，多个 Handler。这是大规模控制器省连接、省内存的关键。
+
+## Metadata Informer（只要元数据）
+
+完整对象很大。若只关心 name、labels、ownerReferences，用 metadata informer：
+
+```go
+import (
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "k8s.io/apimachinery/pkg/runtime/schema"
+    "k8s.io/client-go/metadata"
+    "k8s.io/client-go/metadata/metadatainformer"
+    "k8s.io/client-go/tools/cache"
+)
+
+func setupMetadataInformer(config *rest.Config) {
+    metaClient, err := metadata.NewForConfig(config)
+    if err != nil {
+        panic(err)
+    }
+    factory := metadatainformer.NewSharedInformerFactory(metaClient, 0)
+    gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+    informer := factory.ForResource(gvr).Informer()
+    informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+        AddFunc: func(obj interface{}) {
+            meta := obj.(*metav1.PartialObjectMetadata)
+            fmt.Printf("pod %s/%s labels=%v\n", meta.Namespace, meta.Name, meta.Labels)
+        },
+    })
+}
+```
+
+## Dynamic Informer（CRD）
+
+```go
+import (
+    "k8s.io/client-go/dynamic"
+    "k8s.io/client-go/dynamic/dynamicinformer"
+)
+
+dyn, _ := dynamic.NewForConfig(config)
+factory := dynamicinformer.NewDynamicSharedInformerFactory(dyn, 0)
+gvr := schema.GroupVersionResource{Group: "mysql.example.com", Version: "v1", Resource: "mysqlclusters"}
+informer := factory.ForResource(gvr).Informer()
+```
+
+细节见 [Discovery 与 Dynamic Client](./06-discovery-and-dynamic.md)。
 
 ## 工作队列 (WorkQueue)
 
@@ -1076,9 +1157,11 @@ if err != nil {
 
 **A:** 取决于你的业务需求：
 - `0`：不定期 resync，依赖 Watch 事件
-- `30秒~5分钟`：对实时性要求高的场景
+- `30秒~5分钟`：对实时性要求高、且 Reconcile 很轻的场景
 - `30分钟~1小时`：一般场景
 - 更长：对实时性要求不高的场景
+
+注意：resync 会让每个对象再走一遍更新路径，对象多时队列会被打满。很多现代控制器把 factory resync 设为 `0`，改用自己的定期 enqueue。
 
 ### Q: Informer 会不会占用很多内存？
 
@@ -1134,6 +1217,6 @@ UpdateFunc: func(old, new interface{}) {
 ## 下一步
 
 - [实战项目：自定义控制器](./05-controller-demo.md)
-
-
+- [Discovery 与 Dynamic Client](./06-discovery-and-dynamic.md)
+- [Informer 内部机制（深度）](../11-controller-deep-dive/02-informer-internals.md)
 

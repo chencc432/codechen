@@ -329,9 +329,36 @@ spec:
 
 ## 多容器 Pod 模式
 
-### Sidecar 模式
+### Sidecar 模式（边车）
 
-辅助容器与主容器一起运行，提供支持功能。
+**Sidecar（边车）不是一种独立的 Kubernetes 资源**，而是多容器 Pod 的一种设计模式：在同一个 Pod 里，再放一个「辅助容器」，和主业务容器一起跑，帮主容器干周边的事。
+
+名字来自摩托车边车：主车负责前进，边车挂在旁边提供额外能力，但两者始终同生共死。
+
+#### 和 Init 容器的区别
+
+| | Init 容器 | Sidecar 容器 |
+|---|---|---|
+| 运行时机 | 主容器启动**之前**，按顺序跑完就退出 | 与主容器**同时**运行，生命周期一致 |
+| 典型职责 | 等依赖、拉配置、初始化 | 日志收集、代理、监控、服务网格 |
+| YAML 位置 | `spec.initContainers` | 通常写在 `spec.containers`（和主容器并列） |
+
+> 从 Kubernetes 1.29 起，也可以把 sidecar 写成「带 `restartPolicy: Always` 的 init 容器」，让它在初始化阶段启动后一直活着；常见文档和示例里，仍多写成普通 `containers` 里的第二个容器。
+
+#### 核心特点
+
+1. **共享网络**：和主容器共用一个网络命名空间，可用 `localhost` 互访（这也是网络文档里「同 Pod 多容器」示例的写法来源）
+2. **共享存储**：常通过 `emptyDir` 等 Volume 共享日志目录、socket 等
+3. **共同调度、共同生命周期**：主容器挂了，整个 Pod（含 sidecar）一起重建；不能单独把 sidecar 调度到别的节点
+
+#### 常见用途
+
+1. **日志收集**：主容器写本地文件，sidecar（如 Fluent Bit / Fluentd）负责采集并推送到集中日志系统
+2. **代理 / 服务网格**：如 Istio 的 Envoy sidecar，接管进出流量做 mTLS、限流、可观测
+3. **监控与指标**：sidecar 暴露或刮取指标，主应用无需改代码
+4. **配置 / 证书热更新**：sidecar 拉取最新配置或证书，主容器只读共享目录
+
+#### 示例：日志收集 sidecar
 
 ```yaml
 apiVersion: v1
@@ -347,7 +374,7 @@ spec:
     - name: logs
       mountPath: /var/log/nginx
   
-  # Sidecar - 日志收集
+  # Sidecar - 日志收集（name / image 换成真实镜像即可，没有叫 sidecar 的官方镜像）
   - name: log-collector
     image: fluentd
     volumeMounts:
@@ -358,6 +385,14 @@ spec:
   - name: logs
     emptyDir: {}
 ```
+
+文档里若写到 `name: sidecar` / `image: sidecar`，那只是占位符，表示「这里放一个边车容器」，需要换成实际镜像（如 `fluent/fluent-bit`、`envoyproxy/envoy` 等）。
+
+#### 运维注意
+
+- `kubectl logs <pod>` 默认只看第一个容器；有 sidecar 时要加 `-c <容器名>`
+- `kubectl exec` 同理，必须指定 `-c`，否则可能进错容器
+- 资源 requests/limits 要分别给主容器和 sidecar 算，避免 sidecar 把节点资源吃满拖垮主业务
 
 ### Ambassador 模式
 

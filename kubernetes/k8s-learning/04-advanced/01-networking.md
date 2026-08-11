@@ -49,7 +49,7 @@ Kubernetes 对网络有以下基本要求：
 
 ### 1. 容器到容器（同 Pod）
 
-同一 Pod 内的容器共享网络命名空间，通过 `localhost` 通信。
+同一 Pod 内的容器共享网络命名空间，通过 `localhost` 通信。下面 YAML 里的 `sidecar` 只是占位名，表示「同 Pod 里的辅助容器」；Sidecar 是多容器模式，不是单独的资源类型，说明见 [Pod - Sidecar 模式](../02-resources/01-pod.md#sidecar-模式边车)。
 
 ```yaml
 apiVersion: v1
@@ -62,8 +62,8 @@ spec:
     image: myapp
     ports:
     - containerPort: 8080
-  - name: sidecar
-    image: sidecar
+  - name: log-collector          # 示例：边车容器名
+    image: fluent/fluent-bit     # 换成真实镜像；没有官方镜像叫 sidecar
     # 可以通过 localhost:8080 访问 app
 ```
 
@@ -283,5 +283,140 @@ sudo iptables -t nat -L -n | grep <service-ip>
 
 - [存储系统详解](./02-storage.md)
 
+## 14. 高性能网络：RDMA 与 InfiniBand
 
+前面的章节主要覆盖了 Kubernetes 的基础网络模型和 Service 通信。但 AI 训练场景对网络有更高的要求，这里单独展开。
 
+### 14.1 为什么训练需要高性能网络
+
+分布式训练的核心是**集合通信（Collective Communication）**：每个 GPU 计算完梯度后，需要把所有 GPU 的梯度汇总起来。
+
+```
+AllReduce 通信模式：
+
+Worker 0: 梯度 A  ──────┐
+Worker 1: 梯度 B  ──────┤
+Worker 2: 梯度 C  ──────┼──→ 汇总 → 平均 → 分发 → 所有 Worker 拿到相同梯度
+Worker 3: 梯度 D  ──────┘
+
+通信量 = 模型参数 × 每个参数的字节数 × 通信次数
+一个 7B 参数的模型，FP32 下每次 AllReduce 传输约 28GB 数据
+```
+
+如果网络是瓶颈，GPU 就在空等数据。**网络越慢，GPU 利用率越低**。
+
+### 14.2 NCCL 的通信模式
+
+NCCL 会根据 GPU 之间的拓扑自动选择最优通信路径：
+
+```
+同节点内（GPU 0 ↔ GPU 1）：
+  ┌─────────────────────────────────────┐
+  │  GPU 0 ──── NVLink ──── GPU 1      │
+  │  GPU 2 ──── NVLink ──── GPU 3      │
+  │  GPU 4 ──── NVLink ──── GPU 5      │
+  │  GPU 6 ──── NVLink ──── GPU 7      │
+  └─────────────────────────────────────┘
+  通信路径：NVLink（~600GB/s）
+
+跨节点（Node A 的 GPU 0 ↔ Node B 的 GPU 0）：
+  Node A                     Node B
+  ┌──────────┐              ┌──────────┐
+  │ GPU 0    │              │ GPU 0    │
+  │   │      │              │   │      │
+  │ PCIe    │              │ PCIe    │
+  │   │      │              │   │      │
+  │ IB/RoCE │─────网络─────│ IB/RoCE │
+  │  网卡   │              │  网卡   │
+  └──────────┘              └──────────┘
+  通信路径：PCIe → 网卡 → 网络 → 网卡 → PCIe（~200Gb/s 如果 IB）
+```
+
+### 14.3 Kubernetes 中配置 RDMA
+
+**使用 HostNetwork（最简单）**：
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: training-job
+spec:
+  hostNetwork: true              # 直接使用主机网络栈
+  nodeSelector:
+    accelerator: nvidia
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  containers:
+  - name: trainer
+    image: pytorch:latest
+    env:
+    - name: NCCL_IB_HCA
+      value: "mlx5_0"
+    - name: NCCL_SOCKET_IFNAME
+      value: "eth0"
+    - name: OMPI_MCA_btl
+      value: "^openib"
+    resources:
+      requests:
+        nvidia.com/gpu: 8
+      limits:
+        nvidia.com/gpu: 8
+```
+
+**使用 Multus CNI（多网卡，生产推荐）**：
+
+[Multus](https://github.com/k8snetworkplumbingwg/multus-cni) 允许 Pod 同时挂载多个网络接口——一个用于管理/控制面通信，另一个用于 RDMA 数据面。
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: training-job
+  annotations:
+    k8s.v1.cni.cncf.io/networks: rdma-net   # 附加 RDMA 网卡
+spec:
+  containers:
+  - name: trainer
+    image: pytorch:latest
+    env:
+    - name: NCCL_IB_HCA
+      value: "mlx5_0,mlx5_1"   # 指定 RDMA 网卡
+```
+
+### 14.4 高性能网络监控
+
+**关键指标**：
+
+| 指标 | 工具/命令 | 说明 |
+|------|----------|------|
+| IB 端口状态 | `ibstat` | 检查 IB 链路是否正常 |
+| IB 吞吐 | `ib_read_bw` | 测量 IB 读写带宽 |
+| 网络延迟 | `ibping` | 测量 IB 延迟 |
+| NCCL 通信效率 | `nsys profile` | 分析 NCCL 通信耗时 |
+| 网卡丢包 | `ethtool -S <iface>` | 检查丢包和重传 |
+
+### 14.5 常见问题
+
+```
+问题：NCCL 通信超时
+可能原因：
+  - NCCL_IB_HCA 配置错误
+  - IB 链路故障（光模块、线缆）
+  - 不同节点 IB 固件版本不一致
+  - 交换机端口配置问题
+
+问题：NCCL 未使用 IB（回退到 TCP）
+可能原因：
+  - NCCL_IB_DISABLE 被设置为 1
+  - IB 网卡未被 NCCL 识别
+  - 缺少 libibverbs
+
+问题：跨节点通信性能差
+可能原因：
+  - 节点间 IB 交换机带宽不足
+  - 网络拓扑不是 fat-tree
+  - 多链路没有做负载均衡
+```

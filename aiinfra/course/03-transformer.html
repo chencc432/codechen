@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模块3：Transformer 架构详解</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --muted: #5c5c7a;
+      --accent: #2563eb;
+      --accent-light: #e8f0fe;
+      --border: #e2e8f0;
+      --code-bg: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.75;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+      padding: 0;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+    nav#toc {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      font-size: 0.85rem;
+    }
+    nav#toc h2 {
+      font-size: 0.95rem;
+      margin: 0 0 1rem;
+      color: var(--muted);
+    }
+    nav#toc a {
+      display: block;
+      color: var(--text);
+      text-decoration: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      line-height: 1.4;
+    }
+    nav#toc a:hover { background: var(--accent-light); color: var(--accent); }
+    nav#toc .toc-h3 { padding-left: 1rem; font-size: 0.8rem; color: var(--muted); }
+    main {
+      max-width: 900px;
+      padding: 2rem 2.5rem 4rem;
+    }
+    h1 { font-size: 1.85rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.5rem; }
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: #0f172a;
+    }
+    h3 { font-size: 1.15rem; margin-top: 1.5rem; color: #334155; }
+    blockquote {
+      background: var(--accent-light);
+      border-left: 4px solid var(--accent);
+      margin: 1rem 0;
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      color: #1e3a5f;
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+      font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: 0.85rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th { background: #f8fafc; font-weight: 600; }
+    tr:nth-child(even) { background: #f8fafc; }
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 1rem auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      padding: 8px;
+    }
+    .figure-caption {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+    .mermaid {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      text-align: center;
+    }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin: 0.35rem 0; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav#toc { position: relative; height: auto; max-height: 40vh; }
+      main { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav id="toc"><h2>目录</h2><a class="" href="#3-1-在开始之前-transformer-到底在干嘛">3.1 在开始之前：Transformer 到底在干嘛？</a>
+<a class="toc-h3" href="#一句话">一句话</a>
+<a class="toc-h3" href="#生活类比">生活类比</a>
+<a class="toc-h3" href="#模型的全貌-先记住大框架">模型的全貌（先记住大框架）</a>
+<a class="" href="#3-2-从论文图出发-transformer-系统全景">3.2 从论文图出发：Transformer 系统全景</a>
+<a class="toc-h3" href="#3-2-1-先建立直觉-这台机器在做什么">3.2.1 先建立直觉：这台机器在做什么</a>
+<a class="toc-h3" href="#3-2-2-figure-1-先把整机地图看一遍">3.2.2 Figure 1：先把整机地图看一遍</a>
+<a class="toc-h3" href="#3-2-3-站点①-input-embedding-把文字变成向量">3.2.3 站点①　Input Embedding：把文字变成向量</a>
+<a class="toc-h3" href="#3-2-4-站点②-positional-encoding-告诉模型词的先后顺序">3.2.4 站点②　Positional Encoding：告诉模型词的先后顺序</a>
+<a class="toc-h3" href="#3-2-5-站点③-encoder-layer-读懂整句-重复-6-次">3.2.5 站点③　Encoder Layer：读懂整句（重复 6 次）</a>
+<a class="toc-h3" href="#3-2-6-站点④-decoder-layer-逐词生成译文-重复-6-次">3.2.6 站点④　Decoder Layer：逐词生成译文（重复 6 次）</a>
+<a class="toc-h3" href="#3-2-7-figure-2-拆开-attention-内部-所有-attention-框的通用零件">3.2.7 Figure 2：拆开 Attention 内部（所有 Attention 框的通用零件）</a>
+<a class="toc-h3" href="#3-2-8-站点⑤-linear-softmax-从向量选出下一个词">3.2.8 站点⑤　Linear + Softmax：从向量选出下一个词</a>
+<a class="toc-h3" href="#3-2-9-数据怎么-流动-自回归生成的循环">3.2.9 数据怎么"流动"：自回归生成的循环 ⭐</a>
+<a class="toc-h3" href="#3-2-10-三种-attention-一张表彻底分清">3.2.10 三种 Attention 一张表彻底分清</a>
+<a class="toc-h3" href="#3-2-11-现代-llm-gpt-llama-对这张图做了什么改动">3.2.11 现代 LLM（GPT / Llama）对这张图做了什么改动</a>
+<a class="" href="#3-3-第一步okenization">3.3 第一步okenization）</a>
+<a class="toc-h3" href="#为什么要变数字">为什么要变数字？</a>
+<a class="toc-h3" href="#具体例子">具体例子</a>
+<a class="" href="#3-4-第二步-数字变向量-embedding">3.4 第二步：数字变向量（Embedding）</a>
+<a class="toc-h3" href="#为什么不直接用数字">为什么不直接用数字？</a>
+<a class="toc-h3" href="#解决-用向量表示">解决：用向量表示</a>
+<a class="toc-h3" href="#代码理解">代码理解</a>
+<a class="toc-h3" href="#形状变化">形状变化</a>
+<a class="" href="#3-5-位置编码-告诉模型词的顺序">3.5 位置编码：告诉模型词的顺序</a>
+<a class="toc-h3" href="#问题">问题</a>
+<a class="toc-h3" href="#解决-给向量加上位置信息">解决：给向量加上位置信息</a>
+<a class="" href="#3-6-第三步的核心-self-attention-自注意力">3.6 第三步的核心：Self-Attention（自注意力）</a>
+<a class="toc-h3" href="#3-6-1-attention-要解决什么问题">3.6.1 Attention 要解决什么问题？</a>
+<a class="toc-h3" href="#3-6-2-先搞懂-向量-和-点积-前置知识">3.6.2 先搞懂"向量"和"点积"（前置知识）</a>
+<a class="toc-h3" href="#3-6-3-qkv-是什么-三个类比帮你理解">3.6.3 QKV 是什么？三个类比帮你理解</a>
+<a class="toc-h3" href="#3-6-4-qkv-是怎么算出来的-向量-矩阵">3.6.4 QKV 是怎么算出来的？（向量 × 矩阵）</a>
+<a class="toc-h3" href="#3-6-5-点积为什么能衡量-相关性">3.6.5 点积为什么能衡量"相关性"？</a>
+<a class="toc-h3" href="#3-6-6-完整-attention-计算流程图">3.6.6 完整 Attention 计算流程图</a>
+<a class="toc-h3" href="#3-6-7-手算例子-超详细-一步不跳">3.6.7 手算例子（超详细，一步不跳）</a>
+<a class="toc-h3" href="#3-6-8-总结-attention-公式一行搞定">3.6.8 总结：Attention 公式一行搞定</a>
+<a class="toc-h3" href="#3-6-9-注意力分数矩阵的直觉">3.6.9 注意力分数矩阵的直觉</a>
+<a class="" href="#3-7-multi-head-attention-为什么要多个-头">3.7 Multi-Head Attention：为什么要多个"头"？</a>
+<a class="toc-h3" href="#问题">问题</a>
+<a class="toc-h3" href="#解决-把向量切成多份-每份独立做-attention">解决：把向量切成多份，每份独立做 Attention</a>
+<a class="toc-h3" href="#实际实现-reshape-而非切片">实际实现（reshape 而非切片）</a>
+<a class="" href="#3-8-gqa-减少-kv-的头数">3.8 GQA：减少 KV 的头数</a>
+<a class="toc-h3" href="#问题引入">问题引入</a>
+<a class="toc-h3" href="#解决-让多个-q-head-共享一组-kv">解决：让多个 Q head 共享一组 KV</a>
+<a class="" href="#3-9-transformer-block-的完整结构">3.9 Transformer Block 的完整结构</a>
+<a class="toc-h3" href="#ffn-前馈网络">FFN（前馈网络）</a>
+<a class="" href="#3-10-完整的-llama-2-7b-结构">3.10 完整的 Llama-2-7B 结构</a>
+<a class="" href="#3-11-kv-cache-完全详解">3.11 KV Cache 完全详解</a>
+<a class="toc-h3" href="#3-11-1-先理解推理过程">3.11.1 先理解推理过程</a>
+<a class="toc-h3" href="#3-11-2-没有-kv-cache-的推理-笨方法">3.11.2 没有 KV Cache 的推理（笨方法）</a>
+<a class="toc-h3" href="#3-11-3-关键洞察-为什么-k-和-v-可以缓存">3.11.3 关键洞察：为什么 K 和 V 可以缓存？</a>
+<a class="toc-h3" href="#3-11-4-有-kv-cache-的推理-聪明方法">3.11.4 有 KV Cache 的推理（聪明方法）</a>
+<a class="toc-h3" href="#3-11-5-对比-一张表说清楚">3.11.5 对比：一张表说清楚</a>
+<a class="toc-h3" href="#3-11-6-kv-cache-的形象理解">3.11.6 KV Cache 的形象理解</a>
+<a class="toc-h3" href="#3-11-7-kv-cache-有多大">3.11.7 KV Cache 有多大？</a>
+<a class="toc-h3" href="#3-11-8-各模型-kv-cache-大小对比">3.11.8 各模型 KV Cache 大小对比</a>
+<a class="toc-h3" href="#3-11-9-为什么-kv-cache-是推理的核心瓶颈">3.11.9 为什么 KV Cache 是推理的核心瓶颈？</a>
+<a class="toc-h3" href="#3-11-10-decode-为什么慢-memory-bound">3.11.10 Decode 为什么慢？（Memory Bound）</a>
+<a class="" href="#3-12-训练-vs-推理中-attention-的区别-总结">3.12 训练 vs 推理中 Attention 的区别（总结）</a>
+<a class="" href="#实践练习">实践练习</a>
+<a class="toc-h3" href="#练习-1-手写带-kv-cache-的-attention">练习 1：手写带 KV Cache 的 Attention</a>
+<a class="toc-h3" href="#练习-2-体验有无-kv-cache-的速度差异">练习 2：体验有无 KV Cache 的速度差异</a>
+<a class="toc-h3" href="#练习-3-kv-cache-大小计算器">练习 3：KV Cache 大小计算器</a>
+<a class="toc-h3" href="#练习-4-手写完整的-multi-head-attention">练习 4：手写完整的 Multi-Head Attention</a>
+<a class="toc-h3" href="#练习-5-手写完整-mini-transformer-生成">练习 5：手写完整 Mini Transformer + 生成</a>
+<a class="toc-h3" href="#练习-6-可视化注意力权重">练习 6：可视化注意力权重</a>
+<a class="" href="#自测清单">自测清单</a>
+<a class="toc-h3" href="#qkv-相关">QKV 相关</a>
+<a class="toc-h3" href="#multi-head-相关">Multi-Head 相关</a>
+<a class="toc-h3" href="#kv-cache-相关">KV Cache 相关</a>
+<a class="toc-h3" href="#其他">其他</a>
+<a class="" href="#延伸阅读">延伸阅读</a></nav>
+    <main><h1>模块3：Transformer 架构详解</h1>
+<blockquote>
+<p>📖 <strong>浏览器阅读版</strong>：<a href="./03-transformer.html">03-transformer.html</a>（论文原图 + Mermaid 图表，推荐用浏览器打开）</p>
+<p>预计时间：7-10 天<br />
+目标：彻底理解 Transformer 的每一步计算，重点搞懂 QKV 和 KV Cache<br />
+<strong>这是全课程最重要的模块</strong>，后面所有内容都建立在这里的理解之上</p>
+</blockquote>
+<hr />
+<h2 id="3-1-在开始之前-transformer-到底在干嘛">3.1 在开始之前：Transformer 到底在干嘛？</h2>
+<h3 id="一句话">一句话</h3>
+<p>Transformer 是一个<strong>根据前文预测下一个词</strong>的机器。</p>
+<pre><code>输入: &quot;北京是中国的&quot;
+输出: &quot;首都&quot; (概率最高的下一个词)
+</code></pre>
+<h3 id="生活类比">生活类比</h3>
+<p>想象你在做完形填空：</p>
+<blockquote>
+<p>"今天天气真___"</p>
+</blockquote>
+<p>你的大脑会：
+1. 理解每个词的意思（Embedding）
+2. 分析词与词之间的关系（"天气" 跟 "真" 后面填什么有关）（Attention）
+3. 综合考虑后做出判断（FFN + 输出层）</p>
+<p>Transformer 做的事情完全一样，只是用数学来实现。</p>
+<h3 id="模型的全貌-先记住大框架">模型的全貌（先记住大框架）</h3>
+<div class="mermaid">graph TD
+    A["输入文字: '北京是中国的'"] --> B["第一步: 变成数字&lt;br/>(Tokenizer)"]
+    B --> C["第二步: 数字变向量&lt;br/>(Embedding)"]
+    C --> D["第三步: 向量互相交流&lt;br/>(Attention) × N层"]
+    D --> E["第四步: 选出下一个词&lt;br/>(输出层)"]
+    E --> F["输出: '首都'"]
+
+    style D fill:#e1f5fe</div>
+<p>接下来我们一步步详解。<strong>建议先读 3.2 论文架构全景，再拆零件。</strong></p>
+<hr />
+<h2 id="3-2-从论文图出发-transformer-系统全景">3.2 从论文图出发：Transformer 系统全景</h2>
+<blockquote>
+<p>原论文：<a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>（Vaswani et al., 2017）<br />
+本节用<strong>一个翻译例子</strong>，对照论文 <strong>Figure 1 / Figure 2</strong>，让数据从输入一路流到输出，逐组件、逐步骤讲清楚——<strong>每一步都标出张量形状</strong>，你能清楚看到数据长什么样、怎么变。</p>
+</blockquote>
+<p>为了和论文图完全对齐，本节统一用论文的尺寸（后面讲 Llama 时再换成 4096 那套）：</p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+<th>论文取值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d_model</code></td>
+<td>每个 token 的向量维度</td>
+<td>512</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td>Encoder / Decoder 各自的层数</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>h</code></td>
+<td>注意力头数</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>d_k = d_v</code></td>
+<td>每个头的维度 = d_model / h</td>
+<td>64</td>
+</tr>
+<tr>
+<td><code>d_ff</code></td>
+<td>FFN 中间层维度</td>
+<td>2048</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-2-1-先建立直觉-这台机器在做什么">3.2.1 先建立直觉：这台机器在做什么</h3>
+<p>论文里的 Transformer 是为<strong>机器翻译</strong>设计的，我们全程用这个例子：</p>
+<pre><code>源语言（输入）:  &quot;Je suis étudiant&quot;   （法语：我是学生）
+目标语言（输出）: &quot;I am a student&quot;
+</code></pre>
+<p>整台机器分两半（看 Figure 1：左半 + 右半）：</p>
+<ul>
+<li><strong>Encoder（左）</strong>：把整句源语言<strong>一次性读懂</strong>，压缩成一组"语义向量"（论文叫 memory）。</li>
+<li><strong>Decoder（右）</strong>：拿着这组语义向量，<strong>一个词一个词</strong>地把译文写出来。</li>
+</ul>
+<blockquote>
+<p>现代大模型（GPT、Llama）只保留了 <strong>Decoder 半边</strong>（3.2.12 会讲）。但完整版能把所有零件都讲到，理解完整版后砍半边非常容易。</p>
+</blockquote>
+<h3 id="3-2-2-figure-1-先把整机地图看一遍">3.2.2 Figure 1：先把整机地图看一遍</h3>
+<figure><img alt="Figure 1: The Transformer - model architecture（论文原图）" src="images/transformer-paper/figure1-transformer-architecture.png" /><figcaption class="figure-caption">Figure 1: The Transformer - model architecture（论文原图）</figcaption></figure>
+<p>下面这张图是上面论文图的"数据流版本"，<strong>每条边都标了形状</strong>，先扫一眼建立全局印象，下面再逐站详解：</p>
+<div class="mermaid">graph TD
+    SRC["源句 'Je suis étudiant'"] --> TOK1["Tokenize&lt;br/>→ ID [3]"]
+    TOK1 --> EMB1["Input Embedding&lt;br/>→ [3, 512]"]
+    EMB1 --> PE1["+ Positional Encoding&lt;br/>→ [3, 512]"]
+    PE1 --> ENC["Encoder × 6 层&lt;br/>(Self-Attn + FFN)"]
+    ENC --> MEM["Encoder 输出 memory&lt;br/>[3, 512]"]
+
+    TGT["已生成译文 '&amp;lt;bos> I am'"] --> TOK2["Tokenize&lt;br/>→ ID [3]"]
+    TOK2 --> EMB2["Output Embedding&lt;br/>→ [3, 512]"]
+    EMB2 --> PE2["+ Positional Encoding&lt;br/>→ [3, 512]"]
+    PE2 --> DEC["Decoder × 6 层&lt;br/>(Masked Self-Attn + Cross-Attn + FFN)"]
+    MEM -->|"K,V 来自 Encoder"| DEC
+    DEC --> LIN["Linear + Softmax&lt;br/>[3, 512] → [3, 词表大小]"]
+    LIN --> NEXT["取最后一个位置&lt;br/>→ 下一个词 'a'"]
+
+    style ENC fill:#e3f2fd
+    style DEC fill:#fff3e0
+    style MEM fill:#c8e6c9
+    style NEXT fill:#ffcdd2</div>
+<p><strong>读图口诀：左边 Encoder 读句子，右边 Decoder 写译文，中间一条线（memory）把两边连起来。</strong></p>
+<p>下面 3.2.3 ~ 3.2.10 就沿着这张图，<strong>从上到下、一站一站</strong>走，每站说清三件事：<strong>这个组件做什么 / 数据形状怎么变 / 为什么需要它</strong>。</p>
+<hr />
+<h3 id="3-2-3-站点①-input-embedding-把文字变成向量">3.2.3 站点①　Input Embedding：把文字变成向量</h3>
+<p><strong>位置</strong>：Figure 1 左下角第一个框（"Input Embedding"）。</p>
+<p><strong>做什么</strong>：源句先被切成 token，再查一张大表，把每个整数 ID 换成一个 512 维向量。</p>
+<pre><code>&quot;Je suis étudiant&quot;
+  ↓ Tokenize（切词 + 查词表）
+ID:        [ 1024,  88,  377 ]          形状 [3]
+  ↓ Input Embedding（查 [词表大小, 512] 的表，取出对应行）
+向量:      [[0.1, -0.3, ...],           形状 [3, 512]
+            [0.7,  0.2, ...],
+            [-0.4, 0.9, ...]]
+</code></pre>
+<p><strong>数据形状</strong>：<code>[3]</code>（3 个整数）→ <code>[3, 512]</code>（3 个向量，每个 512 维）。</p>
+<p><strong>为什么需要</strong>：整数 1024 和 1025 没有数值关系，但向量能让"意思相近的词，向量也相近"。这张表是<strong>训练出来的</strong>（详见 3.4）。</p>
+<hr />
+<h3 id="3-2-4-站点②-positional-encoding-告诉模型词的先后顺序">3.2.4 站点②　Positional Encoding：告诉模型词的先后顺序</h3>
+<p><strong>位置</strong>：Figure 1 里 Embedding 上方那个 <code>+</code> 号。</p>
+<p><strong>做什么</strong>：给每个位置算一个 512 维的"位置向量"，<strong>加</strong>到对应的词向量上。</p>
+<pre><code>位置 0 的词向量  +  PE(0)  →  带位置信息的向量
+位置 1 的词向量  +  PE(1)  →  带位置信息的向量
+位置 2 的词向量  +  PE(2)  →  带位置信息的向量
+              （逐元素相加，形状不变）
+</code></pre>
+<p><strong>数据形状</strong>：<code>[3, 512]</code> + <code>[3, 512]</code> → <code>[3, 512]</code>（形状不变）。</p>
+<p><strong>为什么需要</strong>：后面的 Attention 计算<strong>本身不区分顺序</strong>（打乱 token 顺序，注意力结果一样）。不加位置信息，"我爱你"和"你爱我"在模型眼里就一样了。论文用 sin/cos 公式，Llama 改用 RoPE（详见 3.5）。</p>
+<p>到这里，源句已经变成 <code>[3, 512]</code> 的矩阵，准备进入 Encoder。</p>
+<hr />
+<h3 id="3-2-5-站点③-encoder-layer-读懂整句-重复-6-次">3.2.5 站点③　Encoder Layer：读懂整句（重复 6 次）</h3>
+<p><strong>位置</strong>：Figure 1 左侧那个大框（<code>Nx</code> 表示堆叠 6 层）。</p>
+<p>一层 Encoder 内部只有 <strong>2 个子模块</strong>，每个后面跟一个 <strong>Add &amp; Norm</strong>：</p>
+<div class="mermaid">graph TD
+    X["输入 [3, 512]"] --> SA["① Multi-Head&lt;br/>Self-Attention"]
+    SA --> AN1["Add &amp; Norm&lt;br/>x + Attn(x)"]
+    X --> AN1
+    AN1 --> FF["② Feed-Forward&lt;br/>512→2048→512"]
+    FF --> AN2["Add &amp; Norm&lt;br/>x + FFN(x)"]
+    AN1 --> AN2
+    AN2 --> OUT["输出 [3, 512]&lt;br/>形状不变"]
+
+    style SA fill:#e1f5fe
+    style FF fill:#fff9c4
+    style AN1 fill:#c8e6c9
+    style AN2 fill:#c8e6c9</div>
+<h4>子模块①：Multi-Head Self-Attention（让词互相交流）</h4>
+<ul>
+<li><strong>Self（自）</strong>：Q、K、V 全部来自源句自己。</li>
+<li><strong>没有 Mask</strong>：每个词能看到<strong>整句所有词</strong>（前后都行），因为 Encoder 的任务是"读懂"，不是"预测下一个"。</li>
+</ul>
+<pre><code>&quot;étudiant&quot; 的新向量 ≈ 0.6·V(suis) + 0.3·V(Je) + 0.1·V(étudiant)
+→ &quot;étudiant&quot; 吸收了&quot;主语是 Je、动词是 suis&quot;的上下文
+</code></pre>
+<p>形状：输入 <code>[3, 512]</code> → 输出 <code>[3, 512]</code>（每个词换成"看过全句后"的新表示）。内部机制见 3.2.7。</p>
+<h4>Add &amp; Norm（残差 + 归一化）</h4>
+<pre><code>输出 = LayerNorm( x + SelfAttention(x) )
+       └─ 残差：把原始 x 加回来，防止信息丢失、梯度好传
+       └─ LayerNorm：把数值幅度拉回稳定范围
+</code></pre>
+<p>形状不变：<code>[3, 512]</code> → <code>[3, 512]</code>。</p>
+<h4>子模块②：Feed-Forward Network（每个词独立深加工）</h4>
+<p>对<strong>每个位置独立</strong>做一次"先扩维再缩回"：</p>
+<pre><code>[512] --W1--&gt; [2048] --ReLU--&gt; [2048] --W2--&gt; [512]
+       先放大，让模型有空间做复杂非线性变换，再压回原大小
+</code></pre>
+<p>形状：<code>[3, 512]</code> → <code>[3, 512]</code>（注意：位置之间不交互，3 个词各算各的）。</p>
+<h4>一层的总结</h4>
+<p>输入 <code>[3, 512]</code> → 输出 <code>[3, 512]</code>，<strong>形状完全不变</strong>，所以能直接堆 6 层。
+6 层走完，得到 <strong>memory <code>[3, 512]</code></strong>——源句的最终语义表示，交给 Decoder 用。</p>
+<hr />
+<h3 id="3-2-6-站点④-decoder-layer-逐词生成译文-重复-6-次">3.2.6 站点④　Decoder Layer：逐词生成译文（重复 6 次）</h3>
+<p><strong>位置</strong>：Figure 1 右侧大框。比 Encoder <strong>多一个 Cross-Attention</strong>，所以有 <strong>3 个子模块</strong>：</p>
+<div class="mermaid">graph TD
+    X["输入 [t, 512]&lt;br/>已生成的译文"] --> MSA["① Masked&lt;br/>Self-Attention"]
+    MSA --> AN1["Add &amp; Norm"]
+    X --> AN1
+    MEM["Encoder memory&lt;br/>[3, 512]"] --> CA["② Cross-Attention&lt;br/>Q=译文, K/V=memory"]
+    AN1 --> CA
+    CA --> AN2["Add &amp; Norm"]
+    AN1 --> AN2
+    AN2 --> FF["③ Feed-Forward"]
+    FF --> AN3["Add &amp; Norm"]
+    AN2 --> AN3
+    AN3 --> OUT["输出 [t, 512]"]
+
+    style MSA fill:#ffcdd2
+    style CA fill:#e1f5fe
+    style FF fill:#fff9c4
+    style AN1 fill:#c8e6c9
+    style AN2 fill:#c8e6c9
+    style AN3 fill:#c8e6c9</div>
+<h4>子模块①：Masked Self-Attention（只能看已经写出来的词）</h4>
+<p>和 Encoder 的 Self-Attention 一样，但<strong>加了因果 Mask</strong>：</p>
+<pre><code>正在写第 t 个词时，只允许看 第 0 ~ t 个位置，未来的词被遮成 -∞
+原因：生成时未来的词还不存在，不能偷看答案
+</code></pre>
+<p>形状：<code>[t, 512]</code> → <code>[t, 512]</code>。</p>
+<h4>子模块②：Cross-Attention（Encoder 和 Decoder 之间的桥）⭐</h4>
+<p><strong>这就是 Figure 1 中间那条线</strong>，也是整张图最容易忽略、却最关键的一步：</p>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>来自哪里</th>
+<th>直觉</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Q（查询）</strong></td>
+<td>Decoder 自己（当前译文状态）</td>
+<td>"我接下来想表达什么？"</td>
+</tr>
+<tr>
+<td><strong>K（键）</strong></td>
+<td><strong>Encoder memory</strong></td>
+<td>源句每个词的"索引标签"</td>
+</tr>
+<tr>
+<td><strong>V（值）</strong></td>
+<td><strong>Encoder memory</strong></td>
+<td>源句每个词的"实际内容"</td>
+</tr>
+</tbody>
+</table>
+<pre><code>Decoder 当前位置的 Q  ·  Encoder 三个词的 K  →  谁最相关？
+  写 &quot;am&quot; 时，Q 和 &quot;suis&quot; 的 K 最匹配
+  → 取出 &quot;suis&quot; 的 V，混进当前向量
+  → 完成 &quot;法语 suis → 英语 am&quot; 的对齐
+</code></pre>
+<p>形状：Q 是 <code>[t, 512]</code>，K/V 是 <code>[3, 512]</code>（来自 memory），输出 <code>[t, 512]</code>。
+<strong>没有 Mask</strong>——译文可以参考源句的全部词。</p>
+<h4>子模块③：Feed-Forward</h4>
+<p>和 Encoder 的 FFN 完全一样，逐位置 <code>512→2048→512</code>。</p>
+<p>6 层 Decoder 走完，输出 <code>[t, 512]</code>，交给最后的输出层。</p>
+<hr />
+<h3 id="3-2-7-figure-2-拆开-attention-内部-所有-attention-框的通用零件">3.2.7 Figure 2：拆开 Attention 内部（所有 Attention 框的通用零件）</h3>
+<p>上面反复出现"Multi-Head Attention"。它内部到底怎么算？这就是论文 <strong>Figure 2</strong> 的两张图——<strong>左图是单个零件，右图是把零件并联</strong>。</p>
+<p><strong>左图 — Scaled Dot-Product Attention（一次注意力）</strong></p>
+<figure><img alt="Figure 2 left" src="images/transformer-paper/figure2-scaled-dot-product-attention.png" /><figcaption class="figure-caption">Figure 2 left</figcaption></figure>
+<p>一句公式，五个步骤：</p>
+<pre><code>Attention(Q, K, V) = softmax( Q·Kᵀ / √d_k ) · V
+
+① MatMul   : Q·Kᵀ          算每对词的相似度    [t,64]·[64,3] = [t,3]
+② Scale    : ÷ √d_k(=8)    防止数值过大        [t,3]
+③ Mask     : 未来位置→ -∞  仅 Decoder 自注意力  [t,3]
+④ Softmax  : 每行归一化     变成 0~1 的权重      [t,3]
+⑤ MatMul   : 权重 · V       按权重混合内容       [t,3]·[3,64] = [t,64]
+</code></pre>
+<p><strong>右图 — Multi-Head Attention（8 个零件并联）</strong></p>
+<figure><img alt="Figure 2 right" src="images/transformer-paper/figure2-multi-head-attention.png" /><figcaption class="figure-caption">Figure 2 right</figcaption></figure>
+<pre><code>输入 [t, 512]
+  ↓ 用 8 套不同的小矩阵投影，切成 8 个头，每头 64 维
+  Q,K,V 各 → [8 头, t, 64]
+  ↓ 8 个头各自做一次上面的 Scaled Dot-Product Attention（并行）
+  → [8 头, t, 64]
+  ↓ Concat 拼回 [t, 512]
+  ↓ 再过一个 W_O [512,512] 混合各头信息
+输出 [t, 512]
+</code></pre>
+<p><strong>为什么要多头</strong>：一个头只能学一种关系（比如指代）。8 个头能同时学语法、指代、位置等多种关系，最后汇总。详见 3.7。</p>
+<blockquote>
+<p>记住：Figure 1 里<strong>每一个</strong>写着 Multi-Head Attention 的框，内部都是这张右图。区别只在于 <strong>Q/K/V 从哪来、要不要 Mask</strong>（见 3.2.9 对照表）。</p>
+</blockquote>
+<hr />
+<h3 id="3-2-8-站点⑤-linear-softmax-从向量选出下一个词">3.2.8 站点⑤　Linear + Softmax：从向量选出下一个词</h3>
+<p><strong>位置</strong>：Figure 1 最顶部（"Linear" + "Softmax"）。</p>
+<pre><code>Decoder 输出 [t, 512]
+  ↓ Linear（W [512, 词表大小]）        → [t, 词表大小]   每个词一个分数
+  ↓ 只取最后一个位置                    → [词表大小]
+  ↓ Softmax                            → [词表大小] 概率分布
+  ↓ 取概率最大的词（或采样）            → 下一个词，比如 &quot;a&quot;
+</code></pre>
+<p><strong>数据形状</strong>：<code>[t, 512]</code> → <code>[t, 词表大小]</code>，推理时只关心最后一行。</p>
+<hr />
+<h3 id="3-2-9-数据怎么-流动-自回归生成的循环">3.2.9 数据怎么"流动"：自回归生成的循环 ⭐</h3>
+<p>前面是"一遍前向"，但 Decoder 真正生成译文是<strong>一个循环</strong>：每生成一个词，把它接到已生成序列后面，再跑一遍 Decoder，直到输出结束符 <code>&lt;eos&gt;</code>。</p>
+<div class="mermaid">graph LR
+    A["输入 '&amp;lt;bos>'"] --> B["Decoder + 输出层"]
+    B --> C["生成 'I'"]
+    C --> D["输入 '&amp;lt;bos> I'"]
+    D --> E["Decoder + 输出层"]
+    E --> F["生成 'am'"]
+    F --> G["输入 '&amp;lt;bos> I am'"]
+    G --> H["..."]
+    H --> I["生成 '&amp;lt;eos>' 停止"]
+
+    style C fill:#ffcdd2
+    style F fill:#ffcdd2
+    style I fill:#c8e6c9</div>
+<p><strong>完整数据流（Encoder 只跑一次，Decoder 循环跑）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>轮次</th>
+<th>Decoder 输入</th>
+<th>Cross-Attn 看的 memory</th>
+<th>输出层选出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>&lt;bos&gt;</code></td>
+<td><code>[3,512]</code>（"Je suis étudiant"）</td>
+<td><code>I</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>&lt;bos&gt; I</code></td>
+<td>同上（不变）</td>
+<td><code>am</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>&lt;bos&gt; I am</code></td>
+<td>同上</td>
+<td><code>a</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>&lt;bos&gt; I am a</code></td>
+<td>同上</td>
+<td><code>student</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>&lt;bos&gt; I am a student</code></td>
+<td>同上</td>
+<td><code>&lt;eos&gt;</code> → 停</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键观察</strong>：
+- <strong>Encoder 的 memory 只算一次</strong>，整个生成过程反复复用——这正是 Cross-Attention 的 K、V。
+- <strong>Decoder 每轮都把序列加长 1</strong>，重复计算前面的词——这就是 <strong>KV Cache 要优化的地方</strong>（详见 3.11）。</p>
+<hr />
+<h3 id="3-2-10-三种-attention-一张表彻底分清">3.2.10 三种 Attention 一张表彻底分清</h3>
+<p>整张图里出现了 3 处 Attention，名字像、算法同，区别只在 <strong>Q/K/V 来源</strong>和 <strong>Mask</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>出现位置</th>
+<th>Q 来自</th>
+<th>K / V 来自</th>
+<th>Mask？</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Encoder Self-Attn</td>
+<td>Encoder ①</td>
+<td>Encoder</td>
+<td>Encoder</td>
+<td>无</td>
+<td>源句内部互相理解</td>
+</tr>
+<tr>
+<td>Masked Self-Attn</td>
+<td>Decoder ①</td>
+<td>Decoder</td>
+<td>Decoder</td>
+<td><strong>有</strong></td>
+<td>已生成译文自看（不偷看未来）</td>
+</tr>
+<tr>
+<td>Cross-Attn</td>
+<td>Decoder ②</td>
+<td>Decoder</td>
+<td><strong>Encoder memory</strong></td>
+<td>无</td>
+<td>译文对齐源句</td>
+</tr>
+</tbody>
+</table>
+<p>记忆法：<strong>Self = Q/K/V 同源；Cross = Q 是译文、K/V 是源句；带 Mask 的只有 Decoder 的自注意力。</strong></p>
+<hr />
+<h3 id="3-2-11-现代-llm-gpt-llama-对这张图做了什么改动">3.2.11 现代 LLM（GPT / Llama）对这张图做了什么改动</h3>
+<p>GPT、Llama 这类生成式模型<strong>砍掉了整个 Encoder</strong>，只留 Decoder，并去掉了 Cross-Attention：</p>
+<table>
+<thead>
+<tr>
+<th>论文原版（Figure 1）</th>
+<th>GPT / Llama</th>
+<th>为什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Encoder + Decoder</td>
+<td><strong>只有 Decoder</strong></td>
+<td>不做翻译，没有"源句"要编码</td>
+</tr>
+<tr>
+<td>Cross-Attention</td>
+<td><strong>删除</strong></td>
+<td>没有 Encoder memory 可查</td>
+</tr>
+<tr>
+<td>sin/cos 位置编码</td>
+<td><strong>RoPE</strong></td>
+<td>长度外推更好</td>
+</tr>
+<tr>
+<td>Post-Norm</td>
+<td><strong>Pre-Norm + RMSNorm</strong></td>
+<td>深层训练更稳</td>
+</tr>
+<tr>
+<td>ReLU FFN</td>
+<td><strong>SwiGLU</strong></td>
+<td>效果更好</td>
+</tr>
+<tr>
+<td>MHA（KV 头 = Q 头）</td>
+<td><strong>GQA</strong>（KV 头更少）</td>
+<td>省 KV Cache 显存（3.8）</td>
+</tr>
+</tbody>
+</table>
+<p>所以一个 <strong>Llama Block</strong> 就是 Figure 1 右侧 Decoder Layer <strong>去掉 Cross-Attention</strong> 的简化版：</p>
+<div class="mermaid">graph TD
+    X["输入 [seq, 4096]"] --> N1["RMSNorm"]
+    N1 --> A["Masked Multi-Head&lt;br/>Self-Attention (GQA)"]
+    A --> R1["+ 残差"]
+    X --> R1
+    R1 --> N2["RMSNorm"]
+    N2 --> F["SwiGLU FFN&lt;br/>4096→11008→4096"]
+    F --> R2["+ 残差"]
+    R1 --> R2
+    R2 --> OUT["输出 [seq, 4096]"]
+
+    style A fill:#e1f5fe
+    style F fill:#fff9c4
+    style R1 fill:#c8e6c9
+    style R2 fill:#c8e6c9</div>
+<blockquote>
+<p>这台简化机器就是后面 3.3 ~ 3.12 的主角。下面开始把每个零件拆到最细。</p>
+</blockquote>
+<hr />
+<hr />
+<h2 id="3-3-第一步okenization">3.3 第一步okenization）</h2>
+<h3 id="为什么要变数字">为什么要变数字？</h3>
+<p>计算机不认识中文英文，只认识数字。所以第一步是把文字切成小块（token），每块对应一个数字。</p>
+<h3 id="具体例子">具体例子</h3>
+<pre><code>文本: &quot;我喜欢吃苹果&quot;
+
+切分: [&quot;我&quot;, &quot;喜欢&quot;, &quot;吃&quot;, &quot;苹果&quot;]
+
+对应 ID: [158, 4825, 237, 9012]
+</code></pre>
+<p>每个模型有一个<strong>词表</strong>（vocabulary），就像一本字典：</p>
+<pre><code>ID 0    → &quot;&lt;pad&gt;&quot;
+ID 1    → &quot;&lt;unk&gt;&quot;
+ID 158  → &quot;我&quot;
+ID 4825 → &quot;喜欢&quot;
+...
+ID 31999 → &quot;zzz&quot;
+</code></pre>
+<p>Llama 的词表大小 = 32000，意味着它认识 32000 个"词块"。</p>
+<hr />
+<h2 id="3-4-第二步-数字变向量-embedding">3.4 第二步：数字变向量（Embedding）</h2>
+<h3 id="为什么不直接用数字">为什么不直接用数字？</h3>
+<p>数字 158 和 159 虽然相邻，但对应的词可能完全无关。我们需要一种表示方式，让<strong>意思相近的词，表示也相近</strong>。</p>
+<h3 id="解决-用向量表示">解决：用向量表示</h3>
+<p>把每个 token ID 变成一个<strong>高维向量</strong>（如 4096 维）：</p>
+<div class="mermaid">graph LR
+    subgraph "Embedding 查找表 (32000 × 4096 的大矩阵)"
+        ID158["ID 158 → '我' → [0.12, -0.34, 0.56, ..., 0.78]&lt;br/>4096 个数字"]
+        ID4825["ID 4825 → '喜欢' → [0.45, 0.23, -0.11, ..., 0.33]&lt;br/>4096 个数字"]
+        ID237["ID 237 → '吃' → [0.67, -0.12, 0.89, ..., -0.45]&lt;br/>4096 个数字"]
+    end
+
+    style ID158 fill:#e1f5fe</div>
+<p><strong>类比</strong>：把每个词放到一个 4096 维的空间里。意思相近的词会被放在附近的位置。比如"猫"和"狗"的向量比较接近，"猫"和"飞机"的向量很远。</p>
+<h3 id="代码理解">代码理解</h3>
+<pre><code class="language-python">import torch.nn as nn
+
+# Embedding 层本质就是一个查找表
+embedding = nn.Embedding(num_embeddings=32000, embedding_dim=4096)
+# 内部就是一个 [32000, 4096] 的权重矩阵
+
+# 给定 token ID，取出对应行
+token_ids = torch.tensor([158, 4825, 237, 9012])  # 4 个 token
+vectors = embedding(token_ids)  # shape: [4, 4096]
+# 就是从矩阵中取出第 158、4825、237、9012 行
+</code></pre>
+<h3 id="形状变化">形状变化</h3>
+<pre><code>输入: [batch_size, seq_len] 的整数
+    例: [1, 6] — 1 条句子，6 个 token
+
+输出: [batch_size, seq_len, hidden_dim] 的浮点数
+    例: [1, 6, 4096] — 每个 token 是 4096 维向量
+</code></pre>
+<hr />
+<h2 id="3-5-位置编码-告诉模型词的顺序">3.5 位置编码：告诉模型词的顺序</h2>
+<h3 id="问题">问题</h3>
+<p>Embedding 之后，"我喜欢你" 和 "你喜欢我" 的向量集合是一样的（只是顺序不同）。但 Attention 计算<strong>不区分顺序</strong>！</p>
+<h3 id="解决-给向量加上位置信息">解决：给向量加上位置信息</h3>
+<p>当前主流方案是 <strong>RoPE</strong>（Rotary Position Embedding），它对 Q 和 K 做旋转操作：
+- 位置 0 旋转 0°
+- 位置 1 旋转 θ°
+- 位置 n 旋转 n×θ°</p>
+<p>这样位置不同的 token，它们的 Q·K 内积就会不同，模型就能感知到位置了。</p>
+<blockquote>
+<p>暂时理解"位置信息已经编码在向量中"即可，后续用到时再深入。</p>
+</blockquote>
+<hr />
+<h2 id="3-6-第三步的核心-self-attention-自注意力">3.6 第三步的核心：Self-Attention（自注意力）</h2>
+<blockquote>
+<p>这是 Transformer 最精妙也最重要的部分。请耐心读完。</p>
+</blockquote>
+<h3 id="3-6-1-attention-要解决什么问题">3.6.1 Attention 要解决什么问题？</h3>
+<p>考虑句子 "小猫坐在沙发上，因为<strong>它</strong>很累"</p>
+<p>人读到"它"时，大脑会自动把"它"和"小猫"联系起来。这就是 <strong>Attention 做的事</strong>：让每个词能"看到"前面的所有词，并决定重点关注哪些词。</p>
+<div class="mermaid">graph LR
+    小猫 --> |"0.8 强关注"| 它
+    坐在 --> |"0.05"| 它
+    沙发 --> |"0.1"| 它
+    因为 --> |"0.05"| 它
+
+    style 小猫 fill:#ffcdd2
+    style 它 fill:#e1f5fe</div>
+<p>"它"通过 Attention 得到的信息主要来自"小猫"（权重 0.8），少量来自其他词。</p>
+<hr />
+<h3 id="3-6-2-先搞懂-向量-和-点积-前置知识">3.6.2 先搞懂"向量"和"点积"（前置知识）</h3>
+<blockquote>
+<p>如果你已经懂向量和点积，跳过这小节。</p>
+</blockquote>
+<p><strong>向量</strong>就是一组数字：</p>
+<pre><code>向量 a = [3, 4]      ← 就是 2 个数字排一起
+向量 b = [1, 2, 3]   ← 就是 3 个数字排一起
+</code></pre>
+<p>在 Transformer 中，每个 token 被表示为一个 4096 维的向量（4096 个数字）。</p>
+<p><strong>点积</strong>：两个相同长度的向量，对应位置相乘，再加起来：</p>
+<pre><code>a = [1, 2, 3]
+b = [4, 5, 6]
+
+a · b = 1×4 + 2×5 + 3×6 = 4 + 10 + 18 = 32
+</code></pre>
+<p><strong>点积的直觉含义</strong>：衡量两个向量"有多像"。
+- 方向相同 → 点积大（正数）
+- 方向垂直 → 点积 = 0
+- 方向相反 → 点积小（负数）</p>
+<p><strong>矩阵乘法</strong>：就是"批量做点积"。向量 × 矩阵 = 把向量变换成另一个向量：</p>
+<pre><code>向量 x = [1, 2]
+
+矩阵 W = [[3, 0],
+           [1, 4]]
+
+x × W = [1×3 + 2×1,  1×0 + 2×4] = [5, 8]
+         对第一列点积   对第二列点积
+</code></pre>
+<p><strong>一句话</strong>：矩阵乘法就是"用一个矩阵把一个向量变换成另一个向量"。</p>
+<hr />
+<h3 id="3-6-3-qkv-是什么-三个类比帮你理解">3.6.3 QKV 是什么？三个类比帮你理解</h3>
+<h4>类比 1：图书馆找书</h4>
+<div class="mermaid">graph TD
+    subgraph "图书馆类比"
+        Q_lib["Query (查询)&lt;br/>= 你脑子里想找的东西&lt;br/>'我想找关于猫的书'"]
+        K_lib["Key (索引卡)&lt;br/>= 每本书的索引标签&lt;br/>'动物类'、'科技类'..."]
+        V_lib["Value (书的内容)&lt;br/>= 那本书里实际写了什么"]
+    end
+
+    subgraph "过程"
+        S1["1. 你带着脑中的需求(Q)&lt;br/>去比对每本书的标签(K)"]
+        S2["2. 标签和需求越匹配&lt;br/>你越仔细读那本书"]
+        S3["3. 你读到的内容(V)&lt;br/>就是你获取到的信息"]
+        S1 --> S2 --> S3
+    end
+
+    style Q_lib fill:#ffcdd2
+    style K_lib fill:#c8e6c9
+    style V_lib fill:#e1f5fe</div>
+<h4>类比 2：课堂提问</h4>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>类比</th>
+<th>在 Transformer 中</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Q</strong></td>
+<td>学生举手提问："谁能告诉我主语是什么？"</td>
+<td>当前 token 想获取什么信息</td>
+</tr>
+<tr>
+<td><strong>K</strong></td>
+<td>每个同学举的牌子："我知道主语"、"我知道动词"...</td>
+<td>每个 token 能提供什么信息</td>
+</tr>
+<tr>
+<td><strong>V</strong></td>
+<td>那个匹配的同学站起来回答的内容</td>
+<td>被选中的 token 实际传递的信息</td>
+</tr>
+</tbody>
+</table>
+<h4>类比 3：搜索引擎</h4>
+<pre><code>你搜索（Q）：&quot;如何煮咖啡&quot;
+
+网页 1 的标题（K）：&quot;咖啡冲泡指南&quot;  ← 匹配度高！
+网页 1 的内容（V）：&quot;先把水烧到92度...&quot; ← 你读到了这个
+
+网页 2 的标题（K）：&quot;茶叶种类介绍&quot;  ← 匹配度低
+网页 2 的内容（V）：&quot;绿茶是...&quot; ← 你不太看这个
+
+最终你获取的信息 = 80%×网页1内容 + 15%×网页3内容 + 5%×其他
+</code></pre>
+<hr />
+<h3 id="3-6-4-qkv-是怎么算出来的-向量-矩阵">3.6.4 QKV 是怎么算出来的？（向量 × 矩阵）</h3>
+<p>每个 token 有一个向量 x。通过<strong>三个不同的权重矩阵</strong>，把同一个 x 变换成三种不同用途的向量：</p>
+<div class="mermaid">graph TD
+    X["token 的向量 x&lt;br/>比如 '猫' = [0.5, 0.3, -0.1, ...]&lt;br/>共 4096 个数字"]
+    X --> |"x × W_Q (矩阵乘法)"| Q["Q 向量&lt;br/>'猫想要找什么信息'&lt;br/>128 个数字"]
+    X --> |"x × W_K (矩阵乘法)"| K["K 向量&lt;br/>'猫能被什么问题匹配到'&lt;br/>128 个数字"]
+    X --> |"x × W_V (矩阵乘法)"| V["V 向量&lt;br/>'猫要传递的实际信息'&lt;br/>128 个数字"]
+
+    style Q fill:#ffcdd2
+    style K fill:#c8e6c9
+    style V fill:#e1f5fe</div>
+<p><strong>为什么要三个不同的矩阵？</strong></p>
+<p>同一个词在不同角色下需要不同的表示：
+- "猫" 作为<strong>提问者</strong>（Q）：可能在问"我的动作是什么？"
+- "猫" 作为<strong>被查找者</strong>（K）：告诉别人"我是个名词/主语"
+- "猫" 作为<strong>信息源</strong>（V）：把"猫的语义"传给需要的词</p>
+<p>如果 QKV 用同一个矩阵，模型就无法区分这三种角色。</p>
+<p><strong>具体计算</strong>（用极简数字演示）：</p>
+<pre><code>假设 token &quot;猫&quot; 的向量 x = [2, 1]（简化为 2 维）
+
+W_Q = [[1, 0],      ← 权重矩阵 Q（模型学出来的）
+       [0, 1]]
+
+Q = x × W_Q
+  = [2, 1] × [[1, 0],
+               [0, 1]]
+  = [2×1 + 1×0,  2×0 + 1×1]
+  = [2, 1]
+
+同理用 W_K, W_V 算出 K 和 V（不同的矩阵会得到不同的结果）
+</code></pre>
+<blockquote>
+<p><strong>关键理解</strong>：<code>x × W</code> 这个矩阵乘法，就是把向量 x "旋转/变换"到另一个空间。W_Q、W_K、W_V 是三个不同的变换，把同一个 x 变成三种用途的表示。</p>
+</blockquote>
+<hr />
+<h3 id="3-6-5-点积为什么能衡量-相关性">3.6.5 点积为什么能衡量"相关性"？</h3>
+<p>Q 和 K 的点积越大 = 越相关。为什么？</p>
+<pre><code>Q_猫 = [1, 0, 0]   （猫的 Query：在找&quot;动作类&quot;信息）
+K_跑 = [0.9, 0.1, 0]  （跑的 Key：我是一个&quot;动作&quot;）
+K_红 = [0, 0, 0.9]    （红的 Key：我是一个&quot;颜色&quot;）
+
+Q_猫 · K_跑 = 1×0.9 + 0×0.1 + 0×0 = 0.9   ← 高分！猫关注&quot;跑&quot;
+Q_猫 · K_红 = 1×0 + 0×0 + 0×0.9 = 0        ← 低分！猫不关注&quot;红&quot;
+</code></pre>
+<p>直觉：Q 和 K 方向越一致（都指向"动作"方向），点积越大，说明越匹配。</p>
+<hr />
+<h3 id="3-6-6-完整-attention-计算流程图">3.6.6 完整 Attention 计算流程图</h3>
+<div class="mermaid">graph TD
+    subgraph "Step 1: 每个 token 算出自己的 Q, K, V"
+        X["所有 token 的向量&lt;br/>X = [token₀, token₁, token₂, token₃]&lt;br/>shape: [4个token, 4096维]"]
+        X --> |"× W_Q [4096,128]"| QQ["Q: 每个 token 的'问题'&lt;br/>[4, 128]"]
+        X --> |"× W_K [4096,128]"| KK["K: 每个 token 的'标签'&lt;br/>[4, 128]"]
+        X --> |"× W_V [4096,128]"| VV["V: 每个 token 的'内容'&lt;br/>[4, 128]"]
+    end
+
+    subgraph "Step 2: 每对 token 算相关性分数"
+        QQ --> SCORE["Q × K^T (每个Q和每个K做点积)&lt;br/>得到 [4×4] 的分数表&lt;br/>Score[i][j] = token_i 和 token_j 有多相关"]
+        KK --> SCORE
+    end
+
+    subgraph "Step 3: 缩放 + 遮住未来"
+        SCORE --> SCALE["分数 ÷ √128&lt;br/>(防止数字太大导致 softmax 出问题)"]
+        SCALE --> MASK["把'未来'位置的分数设为 -∞&lt;br/>(token 不能偷看后面的内容)"]
+    end
+
+    subgraph "Step 4: 变成概率"
+        MASK --> SOFT["Softmax (每一行)&lt;br/>把分数变成 0~1 的权重，每行加起来=1&lt;br/>权重大 = 重点关注"]
+    end
+
+    subgraph "Step 5: 按权重混合信息"
+        SOFT --> FINAL["权重 × V&lt;br/>每个 token 的输出 = 其他 token 的 V 的加权平均"]
+        VV --> FINAL
+    end
+
+    style QQ fill:#ffcdd2
+    style KK fill:#c8e6c9
+    style VV fill:#e1f5fe
+    style SCORE fill:#fff9c4</div>
+<hr />
+<h3 id="3-6-7-手算例子-超详细-一步不跳">3.6.7 手算例子（超详细，一步不跳）</h3>
+<p><strong>设定</strong>：3 个 token，向量维度 = 2（实际是 4096，这里简化到 2 维方便手算）</p>
+<pre><code>token 0: &quot;我&quot;   的向量 x₀ = [1, 0]
+token 1: &quot;爱&quot;   的向量 x₁ = [0, 1]
+token 2: &quot;你&quot;   的向量 x₂ = [1, 1]
+</code></pre>
+<p>三个权重矩阵（模型训练学到的，这里随便设一个）：</p>
+<pre><code>W_Q = [[1, 0],     W_K = [[0, 1],     W_V = [[1, 0],
+       [0, 1]]           [1, 0]]           [1, 1]]
+</code></pre>
+<hr />
+<h4>Step 1 详解：算 Q、K、V</h4>
+<p><strong>算 Q（每个 token 的"问题"向量）</strong>：</p>
+<pre><code>Q₀ = &quot;我&quot; 的 Q = x₀ × W_Q = [1, 0] × [[1, 0],
+                                          [0, 1]]
+
+怎么算？向量的第1个数 × 矩阵第1行，加上 向量的第2个数 × 矩阵第2行：
+= 1 × [1, 0] + 0 × [0, 1]
+= [1, 0] + [0, 0]
+= [1, 0]  ✓
+
+Q₁ = &quot;爱&quot; 的 Q = x₁ × W_Q = [0, 1] × [[1, 0],
+                                          [0, 1]]
+= 0 × [1, 0] + 1 × [0, 1]
+= [0, 0] + [0, 1]
+= [0, 1]  ✓
+
+Q₂ = &quot;你&quot; 的 Q = x₂ × W_Q = [1, 1] × [[1, 0],
+                                          [0, 1]]
+= 1 × [1, 0] + 1 × [0, 1]
+= [1, 0] + [0, 1]
+= [1, 1]  ✓
+</code></pre>
+<p><strong>算 K（每个 token 的"标签"向量）</strong>：</p>
+<pre><code>K₀ = x₀ × W_K = [1, 0] × [[0, 1],
+                              [1, 0]]
+= 1 × [0, 1] + 0 × [1, 0]
+= [0, 1] + [0, 0]
+= [0, 1]  ✓
+
+K₁ = x₁ × W_K = [0, 1] × [[0, 1],
+                              [1, 0]]
+= 0 × [0, 1] + 1 × [1, 0]
+= [0, 0] + [1, 0]
+= [1, 0]  ✓
+
+K₂ = x₂ × W_K = [1, 1] × [[0, 1],
+                              [1, 0]]
+= 1 × [0, 1] + 1 × [1, 0]
+= [0, 1] + [1, 0]
+= [1, 1]  ✓
+</code></pre>
+<p><strong>算 V（每个 token 的"内容"向量）</strong>：</p>
+<pre><code>V₀ = x₀ × W_V = [1, 0] × [[1, 0],
+                              [1, 1]]
+= 1 × [1, 0] + 0 × [1, 1]
+= [1, 0]  ✓
+
+V₁ = x₁ × W_V = [0, 1] × [[1, 0],
+                              [1, 1]]
+= 0 × [1, 0] + 1 × [1, 1]
+= [1, 1]  ✓
+
+V₂ = x₂ × W_V = [1, 1] × [[1, 0],
+                              [1, 1]]
+= 1 × [1, 0] + 1 × [1, 1]
+= [1, 0] + [1, 1]
+= [2, 1]  ✓
+</code></pre>
+<p><strong>汇总表格</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>token</th>
+<th>原始向量 x</th>
+<th>Q（问题）</th>
+<th>K（标签）</th>
+<th>V（内容）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"我" (位置0)</td>
+<td>[1, 0]</td>
+<td>[1, 0]</td>
+<td>[0, 1]</td>
+<td>[1, 0]</td>
+</tr>
+<tr>
+<td>"爱" (位置1)</td>
+<td>[0, 1]</td>
+<td>[0, 1]</td>
+<td>[1, 0]</td>
+<td>[1, 1]</td>
+</tr>
+<tr>
+<td>"你" (位置2)</td>
+<td>[1, 1]</td>
+<td>[1, 1]</td>
+<td>[1, 1]</td>
+<td>[2, 1]</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4>Step 2 详解：算相关性分数（Q 和 K 的点积）</h4>
+<p>现在每个 token 的 Q 去和每个 token 的 K 做点积，看谁和谁"匹配"：</p>
+<pre><code>&quot;我&quot;的Q 和 &quot;我&quot;的K 的匹配度:  Q₀·K₀ = [1,0]·[0,1] = 1×0 + 0×1 = 0
+&quot;我&quot;的Q 和 &quot;爱&quot;的K 的匹配度:  Q₀·K₁ = [1,0]·[1,0] = 1×1 + 0×0 = 1
+&quot;我&quot;的Q 和 &quot;你&quot;的K 的匹配度:  Q₀·K₂ = [1,0]·[1,1] = 1×1 + 0×1 = 1
+
+&quot;爱&quot;的Q 和 &quot;我&quot;的K 的匹配度:  Q₁·K₀ = [0,1]·[0,1] = 0×0 + 1×1 = 1
+&quot;爱&quot;的Q 和 &quot;爱&quot;的K 的匹配度:  Q₁·K₁ = [0,1]·[1,0] = 0×1 + 1×0 = 0
+&quot;爱&quot;的Q 和 &quot;你&quot;的K 的匹配度:  Q₁·K₂ = [0,1]·[1,1] = 0×1 + 1×1 = 1
+
+&quot;你&quot;的Q 和 &quot;我&quot;的K 的匹配度:  Q₂·K₀ = [1,1]·[0,1] = 1×0 + 1×1 = 1
+&quot;你&quot;的Q 和 &quot;爱&quot;的K 的匹配度:  Q₂·K₁ = [1,1]·[1,0] = 1×1 + 1×0 = 1
+&quot;你&quot;的Q 和 &quot;你&quot;的K 的匹配度:  Q₂·K₂ = [1,1]·[1,1] = 1×1 + 1×1 = 2  ← 最高!
+</code></pre>
+<p>写成分数矩阵（行=Query, 列=Key）：</p>
+<pre><code>              K_&quot;我&quot;  K_&quot;爱&quot;  K_&quot;你&quot;
+Q_&quot;我&quot; →  [   0,      1,      1   ]
+Q_&quot;爱&quot; →  [   1,      0,      1   ]
+Q_&quot;你&quot; →  [   1,      1,      2   ]    ← &quot;你&quot;对自己匹配度最高
+</code></pre>
+<p><strong>怎么读这个矩阵？</strong> 第 i 行第 j 列 = token_i 对 token_j 的关注程度（越大越关注）。</p>
+<hr />
+<h4>Step 3 详解：缩放 + 遮住未来</h4>
+<p><strong>缩放</strong>：所有分数除以 √(向量维度) = √2 ≈ 1.41</p>
+<p>为什么？因为如果维度很大，点积的值会很大，后面 softmax 会变得极端（一个接近 1，其他接近 0）。除以 √d 让数值温和一些。</p>
+<pre><code>缩放后:
+[0/1.41,    1/1.41,    1/1.41  ]     [ 0,     0.71,  0.71]
+[1/1.41,    0/1.41,    1/1.41  ]  =  [ 0.71,  0,     0.71]
+[1/1.41,    1/1.41,    2/1.41  ]     [ 0.71,  0.71,  1.41]
+</code></pre>
+<p><strong>遮住未来（Causal Mask）</strong>：</p>
+<p>规则：位置 i 的 token <strong>不能看到</strong> 位置 &gt; i 的 token（不能偷看后面的词）。</p>
+<pre><code>&quot;我&quot;(位置0) 只能看到: 自己
+&quot;爱&quot;(位置1) 只能看到: &quot;我&quot; 和 自己
+&quot;你&quot;(位置2) 只能看到: &quot;我&quot;、&quot;爱&quot; 和 自己
+</code></pre>
+<p>做法：把不能看到的位置设为 -∞（负无穷大）：</p>
+<pre><code>遮挡后:
+[ 0,     -∞,    -∞   ]     ← &quot;我&quot; 只能看位置0（自己）
+[ 0.71,   0,    -∞   ]     ← &quot;爱&quot; 能看位置0和1
+[ 0.71,  0.71,  1.41 ]     ← &quot;你&quot; 能看所有（0,1,2）
+</code></pre>
+<hr />
+<h4>Step 4 详解：Softmax（变成概率）</h4>
+<p>Softmax 把每一行变成"概率分布"（所有值在 0~1 之间，加起来等于 1）。</p>
+<p><strong>Softmax 公式</strong>：softmax(x_i) = e^(x_i) / 所有 e^(x_j) 的总和</p>
+<p>-∞ 经过 e^(-∞) = 0，自动被忽略！</p>
+<pre><code>第0行: softmax([0, -∞, -∞])
+  e^0 = 1,  e^(-∞) = 0,  e^(-∞) = 0
+  总和 = 1
+  结果: [1/1, 0/1, 0/1] = [1.00, 0.00, 0.00]
+  含义: &quot;我&quot; 100% 关注自己（因为只能看自己）
+
+第1行: softmax([0.71, 0, -∞])
+  e^0.71 ≈ 2.03,  e^0 = 1.00,  e^(-∞) = 0
+  总和 = 2.03 + 1.00 = 3.03
+  结果: [2.03/3.03, 1.00/3.03, 0] = [0.67, 0.33, 0.00]
+  含义: &quot;爱&quot; 67% 关注 &quot;我&quot;，33% 关注自己
+
+第2行: softmax([0.71, 0.71, 1.41])
+  e^0.71 ≈ 2.03,  e^0.71 ≈ 2.03,  e^1.41 ≈ 4.10
+  总和 = 2.03 + 2.03 + 4.10 = 8.16
+  结果: [2.03/8.16, 2.03/8.16, 4.10/8.16] = [0.25, 0.25, 0.50]
+  含义: &quot;你&quot; 25% 关注 &quot;我&quot;，25% 关注 &quot;爱&quot;，50% 关注自己
+</code></pre>
+<p><strong>最终注意力权重矩阵</strong>：</p>
+<pre><code>Attention = [[1.00, 0.00, 0.00],    ← &quot;我&quot; 全部看自己
+             [0.67, 0.33, 0.00],    ← &quot;爱&quot; 主要看 &quot;我&quot;
+             [0.25, 0.25, 0.50]]    ← &quot;你&quot; 一半看自己，一半看前面
+</code></pre>
+<div class="mermaid">graph LR
+    subgraph "注意力权重的含义"
+        W0["'我': 100%看自己"]
+        W1["'爱': 67%看'我' + 33%看自己"]
+        W2["'你': 25%看'我' + 25%看'爱' + 50%看自己"]
+    end
+
+    style W1 fill:#e1f5fe
+    style W2 fill:#c8e6c9</div>
+<hr />
+<h4>Step 5 详解：用权重混合 V（加权求和）</h4>
+<p>现在用上面的权重，对每个 token 的 V 做加权平均：</p>
+<pre><code>&quot;我&quot;的输出 = 1.00 × V_&quot;我&quot; + 0.00 × V_&quot;爱&quot; + 0.00 × V_&quot;你&quot;
+           = 1.00 × [1, 0]
+           = [1.00, 0.00]
+
+&quot;爱&quot;的输出 = 0.67 × V_&quot;我&quot; + 0.33 × V_&quot;爱&quot; + 0.00 × V_&quot;你&quot;
+           = 0.67 × [1, 0] + 0.33 × [1, 1]
+           = [0.67, 0.00] + [0.33, 0.33]
+           = [1.00, 0.33]
+
+&quot;你&quot;的输出 = 0.25 × V_&quot;我&quot; + 0.25 × V_&quot;爱&quot; + 0.50 × V_&quot;你&quot;
+           = 0.25 × [1, 0] + 0.25 × [1, 1] + 0.50 × [2, 1]
+           = [0.25, 0.00] + [0.25, 0.25] + [1.00, 0.50]
+           = [1.50, 0.75]
+</code></pre>
+<p><strong>最终结果</strong>：</p>
+<pre><code>Attention 前:                  Attention 后:
+&quot;我&quot; = [1, 0] (只有自己)  →   &quot;我&quot; = [1.00, 0.00] (没变，只看了自己)
+&quot;爱&quot; = [1, 1] (只有自己)  →   &quot;爱&quot; = [1.00, 0.33] (融合了&quot;我&quot;的信息)
+&quot;你&quot; = [2, 1] (只有自己)  →   &quot;你&quot; = [1.50, 0.75] (融合了所有人的信息)
+</code></pre>
+<blockquote>
+<p><strong>核心收获</strong>：经过 Attention 后，每个 token 的表示不再只包含自己的信息，而是融合了它"关注"的其他 token 的信息。这就是 Attention 的本质——<strong>让 token 之间能交流信息</strong>。</p>
+</blockquote>
+<hr />
+<h3 id="3-6-8-总结-attention-公式一行搞定">3.6.8 总结：Attention 公式一行搞定</h3>
+<p>上面 5 步合起来就是一个公式：</p>
+<pre><code>Attention(Q, K, V) = softmax( Q × K^T / √d + Mask ) × V
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>含义</th>
+<th>形状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q</td>
+<td>每个 token 的"问题"</td>
+<td>[seq_len, head_dim]</td>
+</tr>
+<tr>
+<td>K</td>
+<td>每个 token 的"标签"</td>
+<td>[seq_len, head_dim]</td>
+</tr>
+<tr>
+<td>V</td>
+<td>每个 token 的"内容"</td>
+<td>[seq_len, head_dim]</td>
+</tr>
+<tr>
+<td>Q×K^T</td>
+<td>每对 token 的相关性分数</td>
+<td>[seq_len, seq_len]</td>
+</tr>
+<tr>
+<td>÷√d</td>
+<td>缩放，防止数值太大</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Mask</td>
+<td>遮住未来位置（设为-∞）</td>
+<td>[seq_len, seq_len]</td>
+</tr>
+<tr>
+<td>softmax</td>
+<td>把分数变成 0~1 的权重</td>
+<td>[seq_len, seq_len]</td>
+</tr>
+<tr>
+<td>×V</td>
+<td>用权重加权混合信息</td>
+<td>[seq_len, head_dim]</td>
+</tr>
+</tbody>
+</table>
+<div class="mermaid">graph LR
+    A["Q×K^T&lt;br/>算相关性"] --> B["÷√d&lt;br/>缩放"] --> C["+Mask&lt;br/>遮未来"] --> D["Softmax&lt;br/>变概率"] --> E["×V&lt;br/>取信息"]
+
+    style A fill:#ffcdd2
+    style D fill:#fff9c4
+    style E fill:#c8e6c9</div>
+<hr />
+<h3 id="3-6-9-注意力分数矩阵的直觉">3.6.9 注意力分数矩阵的直觉</h3>
+<pre><code>         Key →
+         &quot;我&quot;  &quot;爱&quot;  &quot;你&quot;
+Q  &quot;我&quot; [ 高    ×     ×  ]   ← 只能看自己
+↓  &quot;爱&quot; [ 高    中    ×  ]   ← 能看前面
+   &quot;你&quot; [ 中    中    高 ]   ← 能看所有
+
+× = -∞ (被 mask 遮住)
+</code></pre>
+<p><strong>每一行</strong>表示一个 token "在关注什么"<br />
+<strong>每一列</strong>表示一个 token "被谁关注"</p>
+<hr />
+<h2 id="3-7-multi-head-attention-为什么要多个-头">3.7 Multi-Head Attention：为什么要多个"头"？</h2>
+<h3 id="问题">问题</h3>
+<p>一组 QKV 只能学到一种关注模式。但语言理解需要同时关注多个方面：</p>
+<pre><code>&quot;The cat sat on the mat because it was tired&quot;
+ ↑                              ↑
+ Head 1: &quot;it&quot; 关注 &quot;cat&quot;（指代关系）
+ Head 2: &quot;tired&quot; 关注 &quot;sat&quot;（因果关系）
+ Head 3: &quot;on&quot; 关注 &quot;mat&quot;（位置关系）
+</code></pre>
+<h3 id="解决-把向量切成多份-每份独立做-attention">解决：把向量切成多份，每份独立做 Attention</h3>
+<div class="mermaid">graph TD
+    X["输入: [seq_len, 4096]"] --> SPLIT["切成 32 份&lt;br/>每份 4096÷32 = 128 维"]
+
+    SPLIT --> H0["Head 0&lt;br/>Q₀,K₀,V₀: [seq, 128]&lt;br/>学习模式 A"]
+    SPLIT --> H1["Head 1&lt;br/>Q₁,K₁,V₁: [seq, 128]&lt;br/>学习模式 B"]
+    SPLIT --> H2["..."]
+    SPLIT --> H31["Head 31&lt;br/>Q₃₁,K₃₁,V₃₁: [seq, 128]&lt;br/>学习模式 Z"]
+
+    H0 --> |"各自做 Attention"| ATT0["输出₀: [seq, 128]"]
+    H1 --> ATT1["输出₁: [seq, 128]"]
+    H31 --> ATT31["输出₃₁: [seq, 128]"]
+
+    ATT0 --> CONCAT["拼接: [seq, 32×128] = [seq, 4096]"]
+    ATT1 --> CONCAT
+    ATT31 --> CONCAT
+
+    CONCAT --> WO["× W_O [4096, 4096]&lt;br/>混合所有头的信息"]
+    WO --> OUT["最终输出: [seq, 4096]"]
+
+    style SPLIT fill:#e1f5fe
+    style CONCAT fill:#c8e6c9</div>
+<p><strong>关键维度公式</strong>：</p>
+<pre><code>hidden_dim = num_heads × head_dim
+
+Llama-2-7B:  4096 = 32 × 128
+Llama-2-70B: 8192 = 64 × 128
+</code></pre>
+<h3 id="实际实现-reshape-而非切片">实际实现（reshape 而非切片）</h3>
+<pre><code class="language-python"># 不是真的切成 32 份，而是 reshape 改变视角
+Q = x @ W_Q                           # [batch, seq, 4096]
+Q = Q.reshape(batch, seq, 32, 128)     # [batch, seq, 32头, 128维/头]
+Q = Q.transpose(1, 2)                  # [batch, 32头, seq, 128]
+
+# 然后所有头并行做 Attention（一次矩阵运算搞定）
+</code></pre>
+<hr />
+<h2 id="3-8-gqa-减少-kv-的头数">3.8 GQA：减少 KV 的头数</h2>
+<h3 id="问题引入">问题引入</h3>
+<p>在推理时，需要缓存每个 token 的 K 和 V（这就是 KV Cache，后面详解）。如果 K 和 V 各有 32 个头，缓存就很大。</p>
+<h3 id="解决-让多个-q-head-共享一组-kv">解决：让多个 Q head 共享一组 KV</h3>
+<div class="mermaid">graph TD
+    subgraph "MHA: 一对一"
+        direction LR
+        MQ["32 个 Q head&lt;br/>Q₀ Q₁ ... Q₃₁"]
+        MK["32 个 K head&lt;br/>K₀ K₁ ... K₃₁"]
+        MV["32 个 V head&lt;br/>V₀ V₁ ... V₃₁"]
+    end
+
+    subgraph "GQA: 多对一 (4:1)"
+        direction LR
+        GQ["32 个 Q head&lt;br/>Q₀Q₁Q₂Q₃ | Q₄Q₅Q₆Q₇ | ..."]
+        GK["8 个 K head&lt;br/>K₀ | K₁ | ... | K₇"]
+        GV["8 个 V head&lt;br/>V₀ | V₁ | ... | V₇"]
+        GQ ---|"每 4 个 Q&lt;br/>共享 1 个 KV"| GK
+    end
+
+    style GK fill:#c8e6c9
+    style GV fill:#c8e6c9</div>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>Q heads</th>
+<th>KV heads</th>
+<th>KV Cache 大小</th>
+<th>质量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MHA</td>
+<td>32</td>
+<td>32</td>
+<td>基准 (100%)</td>
+<td>最好</td>
+</tr>
+<tr>
+<td><strong>GQA</strong></td>
+<td>32</td>
+<td>8</td>
+<td><strong>25%</strong></td>
+<td>很好（几乎无损）</td>
+</tr>
+<tr>
+<td>MQA</td>
+<td>32</td>
+<td>1</td>
+<td>3%</td>
+<td>略有损失</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Llama-3 全系列都用 GQA（8 个 KV heads）</strong>，这是目前工业界的主流选择。</p>
+<hr />
+<h2 id="3-9-transformer-block-的完整结构">3.9 Transformer Block 的完整结构</h2>
+<p>每个 Transformer Block 由 Attention + FFN 组成：</p>
+<div class="mermaid">graph TD
+    INPUT["输入 x&lt;br/>[batch, seq, 4096]"] --> NORM1["RMSNorm&lt;br/>(归一化，稳定训练)"]
+    NORM1 --> ATTN["Multi-Head Attention&lt;br/>token 间信息交互"]
+    ATTN --> ADD1["x + attention_output&lt;br/>(残差连接)"]
+    INPUT --> ADD1
+    ADD1 --> NORM2["RMSNorm"]
+    NORM2 --> FFN["SwiGLU FFN&lt;br/>每个 token 独立的非线性变换&lt;br/>4096 → 11008 → 4096"]
+    FFN --> ADD2["x + ffn_output&lt;br/>(残差连接)"]
+    ADD1 --> ADD2
+    ADD2 --> OUTPUT["输出&lt;br/>[batch, seq, 4096]&lt;br/>形状不变!"]
+
+    style ATTN fill:#e1f5fe
+    style FFN fill:#fff9c4
+    style ADD1 fill:#c8e6c9
+    style ADD2 fill:#c8e6c9</div>
+<p><strong>关键点</strong>：
+- <strong>RMSNorm</strong>：让数值稳定，类似于考试前先把分数标准化
+- <strong>残差连接（+x）</strong>：保证梯度能流通，不会因为层数太多而消失
+- <strong>输入输出形状相同</strong>：所以可以堆叠 32 层</p>
+<h3 id="ffn-前馈网络">FFN（前馈网络）</h3>
+<p>Attention 负责 token 间通信，FFN 负责<strong>每个 token 独立"思考"</strong>。</p>
+<pre><code>FFN(x) = (SiLU(x × W_gate) ⊙ (x × W_up)) × W_down
+</code></pre>
+<p>三个大矩阵：W_gate [4096, 11008], W_up [4096, 11008], W_down [11008, 4096]</p>
+<p><strong>FFN 占模型参数的约 2/3！</strong></p>
+<hr />
+<h2 id="3-10-完整的-llama-2-7b-结构">3.10 完整的 Llama-2-7B 结构</h2>
+<pre><code class="language-python">Llama-2-7B:
+├── Embedding: [32000, 4096]           # 131M 参数
+├── 32 × Transformer Block:
+│   ├── RMSNorm
+│   ├── Multi-Head Attention:
+│   │   ├── W_Q: [4096, 4096]          # 17M
+│   │   ├── W_K: [4096, 4096]          # 17M
+│   │   ├── W_V: [4096, 4096]          # 17M
+│   │   └── W_O: [4096, 4096]          # 17M
+│   ├── RMSNorm
+│   └── SwiGLU FFN:
+│       ├── W_gate: [4096, 11008]       # 45M
+│       ├── W_up:   [4096, 11008]       # 45M
+│       └── W_down: [11008, 4096]       # 45M
+├── Final RMSNorm
+└── LM Head: [4096, 32000]             # 131M 参数
+
+总计: ~6.7B 参数 ≈ 7B
+FP16 存储: 约 14 GB
+</code></pre>
+<hr />
+<h2 id="3-11-kv-cache-完全详解">3.11 KV Cache 完全详解</h2>
+<blockquote>
+<p>这一节是理解推理优化的基础，务必搞清楚。</p>
+</blockquote>
+<h3 id="3-11-1-先理解推理过程">3.11.1 先理解推理过程</h3>
+<p>训练时，所有 token 同时输入，一次算完。但<strong>推理（生成文本）是逐词进行的</strong>：</p>
+<div class="mermaid">sequenceDiagram
+    participant User as 用户
+    participant LLM as 模型
+
+    User->>LLM: 输入 "今天天气"
+
+    Note over LLM: 处理 4 个 token&lt;br/>得到 Q,K,V → 做 Attention&lt;br/>输出概率分布
+
+    LLM->>User: 预测: "很"
+
+    Note over LLM: 现在有 5 个 token: "今天天气很"&lt;br/>需要再算一次 Attention&lt;br/>输出概率分布
+
+    LLM->>User: 预测: "好"
+
+    Note over LLM: 现在有 6 个 token: "今天天气很好"&lt;br/>需要再算一次 Attention
+
+    LLM->>User: 预测: "。"</div>
+<h3 id="3-11-2-没有-kv-cache-的推理-笨方法">3.11.2 没有 KV Cache 的推理（笨方法）</h3>
+<p>如果不做缓存，每生成一个新 token 都要<strong>重新计算所有 token 的 QKV</strong>：</p>
+<div class="mermaid">graph TD
+    subgraph "生成 '很' (第 5 个 token)"
+        S1["输入全部 5 个 token: '今天天气很'&lt;br/>对所有 5 个算 Q, K, V&lt;br/>做 [5×5] 的 Attention"]
+    end
+
+    subgraph "生成 '好' (第 6 个 token)"
+        S2["输入全部 6 个 token: '今天天气很好'&lt;br/>对所有 6 个算 Q, K, V ← 前5个又算了一遍！&lt;br/>做 [6×6] 的 Attention"]
+    end
+
+    subgraph "生成 '。' (第 7 个 token)"
+        S3["输入全部 7 个 token&lt;br/>对所有 7 个算 Q, K, V ← 前6个又算了一遍！！&lt;br/>做 [7×7] 的 Attention"]
+    end
+
+    S1 --> S2 --> S3
+
+    style S2 fill:#ffcdd2
+    style S3 fill:#ffcdd2</div>
+<p><strong>问题</strong>：前面 token 的 K 和 V 被反复重新计算，极度浪费！</p>
+<h3 id="3-11-3-关键洞察-为什么-k-和-v-可以缓存">3.11.3 关键洞察：为什么 K 和 V 可以缓存？</h3>
+<p>看 Attention 公式中，对于位置 i 的 token：</p>
+<pre><code>K_i = x_i × W_K
+V_i = x_i × W_V
+</code></pre>
+<p><strong>K_i 和 V_i 只取决于 x_i 本身！</strong> 不管后面来了多少新 token，位置 i 的 K 和 V 永远不变。</p>
+<div class="mermaid">graph TD
+    subgraph "关键洞察"
+        A["'今' 的 K₀ 和 V₀ 一旦算出来&lt;br/>不管后面生成什么新词&lt;br/>它们永远不会改变！"]
+        B["所以: 算一次就够了&lt;br/>把它们存起来 = KV Cache"]
+    end
+
+    style A fill:#c8e6c9
+    style B fill:#c8e6c9</div>
+<p><strong>为什么 Q 不需要缓存？</strong></p>
+<p>因为在生成新 token 时，我们只需要<strong>新 token 的 Q</strong> 去和所有历史的 K 做匹配。历史 token 的 Q 已经没用了（它们的输出已经计算完了）。</p>
+<h3 id="3-11-4-有-kv-cache-的推理-聪明方法">3.11.4 有 KV Cache 的推理（聪明方法）</h3>
+<div class="mermaid">graph TD
+    subgraph "Prefill: 处理 prompt '今天天气'"
+        PF["4 个 token 一起计算&lt;br/>得到 Q₀Q₁Q₂Q₃, K₀K₁K₂K₃, V₀V₁V₂V₃&lt;br/>做完整 Attention&lt;br/>存储 K₀K₁K₂K₃ 和 V₀V₁V₂V₃ 到 Cache"]
+    end
+
+    subgraph "Decode Step 1: 生成 '很'"
+        D1["只输入 1 个新 token '很'&lt;br/>只计算 Q₄, K₄, V₄&lt;br/>K₄, V₄ 追加到 Cache&lt;br/>Q₄ 和 Cache 中的 [K₀..K₄] 做 Attention"]
+    end
+
+    subgraph "Decode Step 2: 生成 '好'"
+        D2["只输入 1 个新 token '好'&lt;br/>只计算 Q₅, K₅, V₅&lt;br/>K₅, V₅ 追加到 Cache&lt;br/>Q₅ 和 Cache 中的 [K₀..K₅] 做 Attention"]
+    end
+
+    PF --> D1 --> D2
+
+    style PF fill:#e1f5fe
+    style D1 fill:#c8e6c9
+    style D2 fill:#c8e6c9</div>
+<h3 id="3-11-5-对比-一张表说清楚">3.11.5 对比：一张表说清楚</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>无 KV Cache</th>
+<th>有 KV Cache</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每步输入</td>
+<td><strong>所有</strong> token</td>
+<td>只有 <strong>1 个</strong>新 token</td>
+</tr>
+<tr>
+<td>每步计算 K, V</td>
+<td>所有 token 的</td>
+<td>只有新 token 的</td>
+</tr>
+<tr>
+<td>Attention 矩阵</td>
+<td>[N × N] 完整矩阵</td>
+<td>[1 × N] 一行</td>
+</tr>
+<tr>
+<td>前面 token 的 K, V</td>
+<td>重新计算</td>
+<td>从 Cache 读取</td>
+</tr>
+<tr>
+<td>额外显存</td>
+<td>无</td>
+<td>需要存 KV Cache</td>
+</tr>
+<tr>
+<td>速度</td>
+<td>极慢（O(N³) 总计）</td>
+<td>快得多（O(N²) 总计）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-11-6-kv-cache-的形象理解">3.11.6 KV Cache 的形象理解</h3>
+<div class="mermaid">sequenceDiagram
+    participant New as 新 token
+    participant Cache as KV Cache (显存中)
+    participant GPU as GPU 计算
+
+    Note over Cache: Cache = {&lt;br/>K: [K₀, K₁, K₂, K₃]&lt;br/>V: [V₀, V₁, V₂, V₃]&lt;br/>}
+
+    New->>GPU: 新 token "很" 来了!
+    GPU->>GPU: 计算 Q₄, K₄, V₄
+
+    GPU->>Cache: 存入 K₄, V₄
+    Note over Cache: Cache = {&lt;br/>K: [K₀, K₁, K₂, K₃, K₄]&lt;br/>V: [V₀, V₁, V₂, V₃, V₄]&lt;br/>}
+
+    Cache->>GPU: 读取全部 K 和 V
+    GPU->>GPU: Attention: Q₄ × [K₀..K₄]^T → softmax → × [V₀..V₄]
+    GPU-->>New: 输出 → 预测下一个 token</div>
+<h3 id="3-11-7-kv-cache-有多大">3.11.7 KV Cache 有多大？</h3>
+<p><strong>公式</strong>：</p>
+<pre><code>KV Cache = 2 × 层数 × KV头数 × 头维度 × 序列长度 × 数据类型大小
+           ^    ^       ^        ^         ^           ^
+          K和V  32     32/8     128      当前长度     2字节(FP16)
+</code></pre>
+<p><strong>计算例子</strong>：</p>
+<pre><code>Llama-2-7B, MHA (32 KV heads), 序列长度 4096, FP16:
+
+KV Cache = 2 × 32层 × 32头 × 128维 × 4096长度 × 2字节
+         = 2 × 32 × 32 × 128 × 4096 × 2
+         = 2,147,483,648 字节
+         = 2 GB
+
+单个请求就要 2 GB！
+</code></pre>
+<div class="mermaid">graph TD
+    subgraph "Llama-2-7B 推理时显存分布"
+        MODEL["模型参数: 14 GB (FP16)"]
+        KV1["请求 1 的 KV Cache: ~2 GB"]
+        KV2["请求 2 的 KV Cache: ~2 GB"]
+        KV3["请求 3 的 KV Cache: ~2 GB"]
+        OTHER["其他 (激活值等): ~2 GB"]
+    end
+
+    TOTAL["总计 ≈ 22 GB&lt;br/>3 个并发请求就占了 80GB A100 的近 1/4"]
+
+    style KV1 fill:#ffcdd2
+    style KV2 fill:#ffcdd2
+    style KV3 fill:#ffcdd2</div>
+<h3 id="3-11-8-各模型-kv-cache-大小对比">3.11.8 各模型 KV Cache 大小对比</h3>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>层数</th>
+<th>KV heads</th>
+<th>每 token 的 KV (FP16)</th>
+<th>seq=4K</th>
+<th>seq=128K</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Llama-2-7B</td>
+<td>32</td>
+<td>32</td>
+<td>512 KB/token</td>
+<td><strong>2 GB</strong></td>
+<td><strong>64 GB</strong></td>
+</tr>
+<tr>
+<td>Llama-3-8B (GQA)</td>
+<td>32</td>
+<td>8</td>
+<td>128 KB/token</td>
+<td><strong>512 MB</strong></td>
+<td><strong>16 GB</strong></td>
+</tr>
+<tr>
+<td>Llama-2-70B (GQA)</td>
+<td>80</td>
+<td>8</td>
+<td>320 KB/token</td>
+<td><strong>1.28 GB</strong></td>
+<td><strong>40 GB</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>GQA 把 KV Cache 砍了 75%！</strong> 这就是它被广泛使用的原因。</p>
+</blockquote>
+<h3 id="3-11-9-为什么-kv-cache-是推理的核心瓶颈">3.11.9 为什么 KV Cache 是推理的核心瓶颈？</h3>
+<div class="mermaid">graph TD
+    A["KV Cache 大 → 三个后果"]
+    A --> B["显存占用大&lt;br/>限制了同时服务的请求数"]
+    A --> C["读取慢&lt;br/>Decode 时主要时间花在读 KV Cache"]
+    A --> D["浪费多&lt;br/>预分配空间，短请求浪费严重"]
+
+    B --> OPT1["优化: GQA 减少 KV heads"]
+    C --> OPT2["优化: 量化 KV Cache"]
+    D --> OPT3["优化: PagedAttention 按需分配"]
+
+    style B fill:#ffcdd2
+    style C fill:#ffcdd2
+    style D fill:#ffcdd2
+    style OPT1 fill:#c8e6c9
+    style OPT2 fill:#c8e6c9
+    style OPT3 fill:#c8e6c9</div>
+<h3 id="3-11-10-decode-为什么慢-memory-bound">3.11.10 Decode 为什么慢？（Memory Bound）</h3>
+<p>Decode 时，每次只有 1 个新 token：</p>
+<pre><code>Q_new: [1, 128]（只有 1 行）
+K_cache: [N, 128]（N 可能是几千）
+
+Attention = Q_new × K_cache^T = [1, 128] × [128, N] = [1, N]
+</code></pre>
+<p>这是一个<strong>向量乘矩阵</strong>——计算量很少，但需要把整个 K_cache 从显存读出来。</p>
+<pre><code>A100 读取速度: 2 TB/s
+KV Cache 大小: 2 GB (Llama-7B, seq=4096)
+纯读取时间: 2GB / 2TB/s = 1 ms
+
+模型参数: 14 GB
+纯读取时间: 14GB / 2TB/s = 7 ms
+
+总计读取: 约 8 ms → 这就是每个 token 的延迟！
+
+实际计算时间: &lt; 0.1 ms → GPU 算力严重浪费(利用率 &lt; 5%)
+</code></pre>
+<p><strong>结论</strong>：推理 Decode 的瓶颈是"从显存读数据太慢"（Memory Bound），不是"算不过来"。</p>
+<hr />
+<h2 id="3-12-训练-vs-推理中-attention-的区别-总结">3.12 训练 vs 推理中 Attention 的区别（总结）</h2>
+<div class="mermaid">graph LR
+    subgraph "训练时"
+        T1["所有 token 一起输入"]
+        T2["Q: [512, 128]&lt;br/>K: [512, 128]&lt;br/>V: [512, 128]"]
+        T3["QK^T: [512×512]&lt;br/>大矩阵乘法"]
+        T4["Compute Bound&lt;br/>GPU 算力跑满"]
+        T1 --> T2 --> T3 --> T4
+    end
+
+    subgraph "推理 Decode 时"
+        I1["每次只有 1 个新 token"]
+        I2["Q: [1, 128] (新)&lt;br/>K: [N, 128] (Cache)&lt;br/>V: [N, 128] (Cache)"]
+        I3["QK^T: [1×N]&lt;br/>向量×矩阵"]
+        I4["Memory Bound&lt;br/>GPU 大部分时间在等数据"]
+        I1 --> I2 --> I3 --> I4
+    end
+
+    style T4 fill:#c8e6c9
+    style I4 fill:#ffcdd2</div>
+<hr />
+<h2 id="实践练习">实践练习</h2>
+<h3 id="练习-1-手写带-kv-cache-的-attention">练习 1：手写带 KV Cache 的 Attention</h3>
+<pre><code class="language-python">import torch
+import torch.nn.functional as F
+
+class AttentionWithKVCache:
+    &quot;&quot;&quot;从零实现带 KV Cache 的 Attention，理解每一步&quot;&quot;&quot;
+
+    def __init__(self, hidden_dim=64, head_dim=16):
+        # 随机初始化权重矩阵
+        self.W_q = torch.randn(hidden_dim, head_dim) * 0.1
+        self.W_k = torch.randn(hidden_dim, head_dim) * 0.1
+        self.W_v = torch.randn(hidden_dim, head_dim) * 0.1
+
+        # KV Cache: 空列表
+        self.k_cache = None  # 将存储所有历史 K
+        self.v_cache = None  # 将存储所有历史 V
+
+    def clear_cache(self):
+        self.k_cache = None
+        self.v_cache = None
+
+    def prefill(self, x):
+        &quot;&quot;&quot;
+        Prefill: 一次性处理所有 prompt token
+        x: [seq_len, hidden_dim]
+        返回: [seq_len, head_dim]
+        &quot;&quot;&quot;
+        seq_len = x.shape[0]
+        print(f&quot;\n=== Prefill: 处理 {seq_len} 个 prompt token ===&quot;)
+
+        # 计算所有 token 的 Q, K, V
+        Q = x @ self.W_q  # [seq_len, head_dim]
+        K = x @ self.W_k  # [seq_len, head_dim]
+        V = x @ self.W_v  # [seq_len, head_dim]
+        print(f&quot;  Q shape: {Q.shape}&quot;)
+        print(f&quot;  K shape: {K.shape}&quot;)
+        print(f&quot;  V shape: {V.shape}&quot;)
+
+        # 存入 KV Cache
+        self.k_cache = K.clone()
+        self.v_cache = V.clone()
+        print(f&quot;  KV Cache 初始化: [{self.k_cache.shape[0]} tokens cached]&quot;)
+
+        # 完整的 Causal Attention
+        head_dim = Q.shape[-1]
+        scores = Q @ K.T / (head_dim ** 0.5)  # [seq_len, seq_len]
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+        scores.masked_fill_(mask, float('-inf'))
+        attn_weights = F.softmax(scores, dim=-1)
+        output = attn_weights @ V  # [seq_len, head_dim]
+
+        print(f&quot;  Attention 矩阵大小: [{seq_len} × {seq_len}]&quot;)
+        print(f&quot;  输出 shape: {output.shape}&quot;)
+        return output
+
+    def decode_one_token(self, x_new):
+        &quot;&quot;&quot;
+        Decode: 处理 1 个新 token
+        x_new: [1, hidden_dim] 新 token 的 embedding
+        返回: [1, head_dim]
+        &quot;&quot;&quot;
+        current_len = self.k_cache.shape[0]
+        print(f&quot;\n--- Decode: 第 {current_len + 1} 个 token ---&quot;)
+
+        # 只计算新 token 的 Q, K, V
+        q_new = x_new @ self.W_q  # [1, head_dim]
+        k_new = x_new @ self.W_k  # [1, head_dim]
+        v_new = x_new @ self.W_v  # [1, head_dim]
+        print(f&quot;  新 token 的 Q: {q_new.shape}&quot;)
+
+        # 把新 K, V 追加到 Cache
+        self.k_cache = torch.cat([self.k_cache, k_new], dim=0)
+        self.v_cache = torch.cat([self.v_cache, v_new], dim=0)
+        new_len = self.k_cache.shape[0]
+        print(f&quot;  KV Cache 更新: {current_len} → {new_len} tokens&quot;)
+
+        # Attention: 新 Q 和全部缓存的 K 做匹配
+        head_dim = q_new.shape[-1]
+        scores = q_new @ self.k_cache.T / (head_dim ** 0.5)  # [1, new_len]
+        attn_weights = F.softmax(scores, dim=-1)  # [1, new_len] 不需要mask(新token是最后一个)
+        output = attn_weights @ self.v_cache  # [1, head_dim]
+
+        print(f&quot;  Attention: Q[1,{head_dim}] × K_cache[{new_len},{head_dim}]^T = scores[1,{new_len}]&quot;)
+        print(f&quot;  注意力权重: {attn_weights.squeeze().detach().numpy().round(3)}&quot;)
+        return output
+
+
+# ========== 完整演示 ==========
+torch.manual_seed(42)
+hidden_dim, head_dim = 16, 4
+
+attn = AttentionWithKVCache(hidden_dim, head_dim)
+
+# 模拟 prompt: 3 个 token (假装是 &quot;今天天气&quot;)
+prompt = torch.randn(3, hidden_dim)
+print(&quot;=&quot; * 50)
+print(&quot;Prompt: 3 个 token&quot;)
+print(&quot;=&quot; * 50)
+prefill_out = attn.prefill(prompt)
+
+# 逐个生成新 token
+print(&quot;\n&quot; + &quot;=&quot; * 50)
+print(&quot;Decode: 逐个生成&quot;)
+print(&quot;=&quot; * 50)
+
+for i in range(4):
+    new_token_embedding = torch.randn(1, hidden_dim)
+    decode_out = attn.decode_one_token(new_token_embedding)
+
+print(f&quot;\n最终 KV Cache 包含 {attn.k_cache.shape[0]} 个 token 的 K 和 V&quot;)
+print(f&quot;KV Cache 大小: K={attn.k_cache.shape}, V={attn.v_cache.shape}&quot;)
+</code></pre>
+<p><strong>运行后观察</strong>：
+- Prefill 阶段一次处理多个 token，KV Cache 初始化
+- 每次 Decode 只计算 1 个新 token 的 QKV
+- KV Cache 每步增长 1 行
+- Attention 的 scores 维度是 [1, 当前总长度]</p>
+<h3 id="练习-2-体验有无-kv-cache-的速度差异">练习 2：体验有无 KV Cache 的速度差异</h3>
+<pre><code class="language-python">import torch
+import torch.nn.functional as F
+import time
+
+class NaiveAttention:
+    &quot;&quot;&quot;无 KV Cache: 每次重新计算所有 token&quot;&quot;&quot;
+
+    def __init__(self, dim=64, head_dim=16):
+        self.W_q = torch.randn(dim, head_dim, device='cpu') * 0.1
+        self.W_k = torch.randn(dim, head_dim, device='cpu') * 0.1
+        self.W_v = torch.randn(dim, head_dim, device='cpu') * 0.1
+
+    def generate_step(self, all_tokens):
+        &quot;&quot;&quot;
+        重新计算所有 token 的 QKV
+        all_tokens: [current_len, dim]
+        &quot;&quot;&quot;
+        seq_len = all_tokens.shape[0]
+        Q = all_tokens @ self.W_q
+        K = all_tokens @ self.W_k
+        V = all_tokens @ self.W_v
+
+        scores = Q @ K.T / (Q.shape[-1] ** 0.5)
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool()
+        scores.masked_fill_(mask, float('-inf'))
+        weights = F.softmax(scores, dim=-1)
+        output = weights @ V
+        return output[-1:]  # 只要最后一个位置的输出
+
+class CachedAttention:
+    &quot;&quot;&quot;有 KV Cache: 只算新 token&quot;&quot;&quot;
+
+    def __init__(self, dim=64, head_dim=16):
+        self.W_q = torch.randn(dim, head_dim, device='cpu') * 0.1
+        self.W_k = torch.randn(dim, head_dim, device='cpu') * 0.1
+        self.W_v = torch.randn(dim, head_dim, device='cpu') * 0.1
+        self.k_cache = None
+        self.v_cache = None
+
+    def prefill(self, tokens):
+        K = tokens @ self.W_k
+        V = tokens @ self.W_v
+        self.k_cache = K
+        self.v_cache = V
+
+    def generate_step(self, new_token):
+        &quot;&quot;&quot;只计算 1 个新 token&quot;&quot;&quot;
+        q = new_token @ self.W_q
+        k = new_token @ self.W_k
+        v = new_token @ self.W_v
+
+        self.k_cache = torch.cat([self.k_cache, k], dim=0)
+        self.v_cache = torch.cat([self.v_cache, v], dim=0)
+
+        scores = q @ self.k_cache.T / (q.shape[-1] ** 0.5)
+        weights = F.softmax(scores, dim=-1)
+        output = weights @ self.v_cache
+        return output
+
+# 性能对比
+dim = 512
+head_dim = 64
+prompt_len = 100
+generate_len = 200
+
+prompt = torch.randn(prompt_len, dim)
+
+# 方法 1: 无缓存
+naive = NaiveAttention(dim, head_dim)
+all_tokens = prompt.clone()
+
+start = time.time()
+for step in range(generate_len):
+    new_token = torch.randn(1, dim)
+    all_tokens = torch.cat([all_tokens, new_token], dim=0)
+    _ = naive.generate_step(all_tokens)
+naive_time = time.time() - start
+
+# 方法 2: 有缓存
+cached = CachedAttention(dim, head_dim)
+cached.W_q = naive.W_q
+cached.W_k = naive.W_k
+cached.W_v = naive.W_v
+cached.prefill(prompt)
+
+start = time.time()
+for step in range(generate_len):
+    new_token = torch.randn(1, dim)
+    _ = cached.generate_step(new_token)
+cached_time = time.time() - start
+
+print(f&quot;生成 {generate_len} 个 token (prompt={prompt_len}):&quot;)
+print(f&quot;  无 KV Cache: {naive_time*1000:.1f} ms&quot;)
+print(f&quot;  有 KV Cache: {cached_time*1000:.1f} ms&quot;)
+print(f&quot;  加速比: {naive_time/cached_time:.1f}x&quot;)
+print(f&quot;\n原因: 无缓存版本每步重新计算前面所有 token 的 K,V&quot;)
+print(f&quot;      有缓存版本每步只算 1 个新 token 的 K,V&quot;)
+</code></pre>
+<h3 id="练习-3-kv-cache-大小计算器">练习 3：KV Cache 大小计算器</h3>
+<pre><code class="language-python">def kv_cache_calculator():
+    &quot;&quot;&quot;交互式 KV Cache 大小计算&quot;&quot;&quot;
+
+    configs = {
+        &quot;Llama-2-7B (MHA)&quot;:   {&quot;layers&quot;: 32, &quot;kv_heads&quot;: 32, &quot;head_dim&quot;: 128},
+        &quot;Llama-3-8B (GQA)&quot;:   {&quot;layers&quot;: 32, &quot;kv_heads&quot;: 8,  &quot;head_dim&quot;: 128},
+        &quot;Llama-2-70B (GQA)&quot;:  {&quot;layers&quot;: 80, &quot;kv_heads&quot;: 8,  &quot;head_dim&quot;: 128},
+        &quot;Llama-3-70B (GQA)&quot;:  {&quot;layers&quot;: 80, &quot;kv_heads&quot;: 8,  &quot;head_dim&quot;: 128},
+        &quot;GPT-4 级别 (推测)&quot;:   {&quot;layers&quot;: 120, &quot;kv_heads&quot;: 16, &quot;head_dim&quot;: 128},
+    }
+
+    print(&quot;=&quot; * 70)
+    print(&quot;KV Cache 大小计算器&quot;)
+    print(&quot;=&quot; * 70)
+    print(f&quot;\n公式: KV_Cache = 2 × layers × kv_heads × head_dim × seq_len × 2bytes&quot;)
+    print(f&quot;       (2 是因为 K 和 V 各一份, 2bytes 是 FP16)&quot;)
+
+    seq_lengths = [1024, 4096, 8192, 32768, 131072]
+
+    # 表头
+    header = f&quot;{'模型':&lt;22}&quot;
+    for seq in seq_lengths:
+        if seq &gt;= 1024:
+            header += f&quot;{'seq='+str(seq//1024)+'K':&gt;10}&quot;
+        else:
+            header += f&quot;{'seq='+str(seq):&gt;10}&quot;
+    print(f&quot;\n{header}&quot;)
+    print(&quot;-&quot; * (22 + 10 * len(seq_lengths)))
+
+    for name, cfg in configs.items():
+        row = f&quot;{name:&lt;22}&quot;
+        for seq_len in seq_lengths:
+            size_bytes = 2 * cfg['layers'] * cfg['kv_heads'] * cfg['head_dim'] * seq_len * 2
+            size_gb = size_bytes / 1024**3
+            if size_gb &gt;= 1:
+                row += f&quot;{size_gb:&gt;8.1f}GB&quot;
+            else:
+                row += f&quot;{size_gb*1024:&gt;7.0f}MB &quot;
+        print(row)
+
+    # Batch 影响
+    print(f&quot;\n\n{'='*70}&quot;)
+    print(&quot;并发请求数的影响 (Llama-3-8B, seq=4096)&quot;)
+    print(&quot;=&quot; * 70)
+    cfg = configs[&quot;Llama-3-8B (GQA)&quot;]
+    model_size = 16  # GB, FP16
+    for batch in [1, 8, 16, 32, 64, 128]:
+        kv_size = 2 * cfg['layers'] * cfg['kv_heads'] * cfg['head_dim'] * 4096 * 2 * batch
+        kv_gb = kv_size / 1024**3
+        total = model_size + kv_gb
+        status = &quot;✓ 放得下&quot; if total &lt; 80 else &quot;✗ OOM (&gt;80GB)&quot;
+        print(f&quot;  batch={batch:3d}: KV Cache = {kv_gb:5.1f} GB, &quot;
+              f&quot;总需 = {total:5.1f} GB  {status}&quot;)
+
+kv_cache_calculator()
+</code></pre>
+<h3 id="练习-4-手写完整的-multi-head-attention">练习 4：手写完整的 Multi-Head Attention</h3>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MyMultiHeadAttention(nn.Module):
+    &quot;&quot;&quot;手写多头注意力，带详细注释&quot;&quot;&quot;
+
+    def __init__(self, hidden_dim=256, num_heads=8):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads  # 256/8 = 32
+        self.hidden_dim = hidden_dim
+
+        # QKV 的投影矩阵
+        self.W_q = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.W_k = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.W_v = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.W_o = nn.Linear(hidden_dim, hidden_dim, bias=False)
+
+    def forward(self, x):
+        &quot;&quot;&quot;
+        x: [batch, seq_len, hidden_dim]
+        &quot;&quot;&quot;
+        batch, seq_len, _ = x.shape
+
+        # === Step 1: 投影 ===
+        Q = self.W_q(x)  # [batch, seq, hidden_dim]
+        K = self.W_k(x)
+        V = self.W_v(x)
+
+        # === Step 2: reshape 成多头 ===
+        # [batch, seq, hidden_dim] → [batch, seq, num_heads, head_dim] → [batch, num_heads, seq, head_dim]
+        Q = Q.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        # 现在: [batch, num_heads, seq_len, head_dim]
+
+        # === Step 3: 计算注意力分数 ===
+        scores = Q @ K.transpose(-2, -1) / (self.head_dim ** 0.5)
+        # scores: [batch, num_heads, seq_len, seq_len]
+
+        # === Step 4: Causal Mask ===
+        mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
+        scores.masked_fill_(mask, float('-inf'))
+
+        # === Step 5: Softmax ===
+        attn_weights = F.softmax(scores, dim=-1)
+        # attn_weights: [batch, num_heads, seq_len, seq_len]
+
+        # === Step 6: 加权求和 ===
+        output = attn_weights @ V
+        # output: [batch, num_heads, seq_len, head_dim]
+
+        # === Step 7: 合并多头 ===
+        output = output.transpose(1, 2).reshape(batch, seq_len, self.hidden_dim)
+        # output: [batch, seq_len, hidden_dim]
+
+        # === Step 8: 输出投影 ===
+        output = self.W_o(output)
+
+        return output, attn_weights
+
+# 测试
+mha = MyMultiHeadAttention(hidden_dim=256, num_heads=8)
+x = torch.randn(1, 10, 256)  # 1 条句子，10 个 token
+output, weights = mha(x)
+
+print(f&quot;输入 shape: {x.shape}&quot;)
+print(f&quot;输出 shape: {output.shape}&quot;)
+print(f&quot;注意力权重 shape: {weights.shape}&quot;)
+print(f&quot;  = [batch={1}, heads={8}, seq={10}, seq={10}]&quot;)
+print(f&quot;\n验证: 每行权重和为 1: {weights[0, 0, 5].sum().item():.6f}&quot;)
+print(f&quot;验证: 未来位置权重为 0: {weights[0, 0, 3, 5].item():.6f}&quot;)  # pos 3 看不到 pos 5
+print(f&quot;\n✓ 实现正确!&quot;)
+</code></pre>
+<h3 id="练习-5-手写完整-mini-transformer-生成">练习 5：手写完整 Mini Transformer + 生成</h3>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim, eps=1e-6):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(dim))
+        self.eps = eps
+
+    def forward(self, x):
+        rms = torch.sqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+        return x / rms * self.weight
+
+class MiniLLM(nn.Module):
+    &quot;&quot;&quot;一个完整的迷你语言模型，可以做文本生成&quot;&quot;&quot;
+
+    def __init__(self, vocab_size=100, hidden_dim=128, num_heads=4, num_layers=4):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, hidden_dim)
+        self.layers = nn.ModuleList()
+        for _ in range(num_layers):
+            self.layers.append(nn.ModuleDict({
+                'norm1': RMSNorm(hidden_dim),
+                'attn_qkv': nn.Linear(hidden_dim, 3 * hidden_dim, bias=False),
+                'attn_out': nn.Linear(hidden_dim, hidden_dim, bias=False),
+                'norm2': RMSNorm(hidden_dim),
+                'ffn_gate': nn.Linear(hidden_dim, hidden_dim * 4, bias=False),
+                'ffn_up': nn.Linear(hidden_dim, hidden_dim * 4, bias=False),
+                'ffn_down': nn.Linear(hidden_dim * 4, hidden_dim, bias=False),
+            }))
+        self.final_norm = RMSNorm(hidden_dim)
+        self.lm_head = nn.Linear(hidden_dim, vocab_size, bias=False)
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+
+    def attention(self, x, layer):
+        &quot;&quot;&quot;带 Causal Mask 的多头注意力&quot;&quot;&quot;
+        batch, seq_len, _ = x.shape
+        qkv = layer['attn_qkv'](x)
+        q, k, v = qkv.chunk(3, dim=-1)
+
+        q = q.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        k = k.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+        v = v.reshape(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores = q @ k.transpose(-2, -1) / (self.head_dim ** 0.5)
+        mask = torch.triu(torch.ones(seq_len, seq_len, device=x.device), diagonal=1).bool()
+        scores.masked_fill_(mask, float('-inf'))
+        attn = F.softmax(scores, dim=-1)
+        out = (attn @ v).transpose(1, 2).reshape(batch, seq_len, -1)
+        return layer['attn_out'](out)
+
+    def ffn(self, x, layer):
+        &quot;&quot;&quot;SwiGLU FFN&quot;&quot;&quot;
+        gate = F.silu(layer['ffn_gate'](x))
+        up = layer['ffn_up'](x)
+        return layer['ffn_down'](gate * up)
+
+    def forward(self, input_ids):
+        x = self.embedding(input_ids)
+        for layer in self.layers:
+            x = x + self.attention(layer['norm1'](x), layer)
+            x = x + self.ffn(layer['norm2'](x), layer)
+        x = self.final_norm(x)
+        logits = self.lm_head(x)
+        return logits
+
+    @torch.no_grad()
+    def generate(self, input_ids, max_new_tokens=20, temperature=1.0):
+        &quot;&quot;&quot;自回归生成（无 KV Cache 版本，便于理解）&quot;&quot;&quot;
+        for _ in range(max_new_tokens):
+            logits = self.forward(input_ids)  # [batch, seq, vocab]
+            next_token_logits = logits[:, -1, :] / temperature
+            probs = F.softmax(next_token_logits, dim=-1)
+            next_token = torch.multinomial(probs, 1)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+        return input_ids
+
+# 训练一个迷你语言模型
+torch.manual_seed(42)
+model = MiniLLM(vocab_size=50, hidden_dim=64, num_heads=4, num_layers=2)
+
+# 模拟一些训练数据 (随机序列，仅做演示)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+print(&quot;训练 Mini LLM...&quot;)
+for step in range(200):
+    data = torch.randint(0, 50, (4, 32))  # batch=4, seq=32
+    logits = model(data[:, :-1])  # 输入前 31 个
+    targets = data[:, 1:]  # 目标是后 31 个
+    loss = F.cross_entropy(logits.reshape(-1, 50), targets.reshape(-1))
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    if step % 50 == 0:
+        print(f&quot;  Step {step}: loss = {loss.item():.3f}&quot;)
+
+# 生成
+print(&quot;\n生成文本 (随机 token，因为训练数据是随机的):&quot;)
+prompt = torch.randint(0, 50, (1, 5))
+print(f&quot;  Prompt IDs: {prompt[0].tolist()}&quot;)
+generated = model.generate(prompt, max_new_tokens=10)
+print(f&quot;  Generated IDs: {generated[0].tolist()}&quot;)
+print(f&quot;\n模型参数量: {sum(p.numel() for p in model.parameters())/1e3:.1f}K&quot;)
+print(&quot;✓ 完整的 Mini LLM 训练和生成成功!&quot;)
+</code></pre>
+<h3 id="练习-6-可视化注意力权重">练习 6：可视化注意力权重</h3>
+<pre><code class="language-python">import torch
+import matplotlib.pyplot as plt
+import numpy as np
+
+def visualize_attention():
+    &quot;&quot;&quot;可视化不同层、不同头的注意力模式&quot;&quot;&quot;
+
+    # 模拟一个 4 头的 attention 权重
+    seq_len = 8
+    tokens = [&quot;The&quot;, &quot;cat&quot;, &quot;sat&quot;, &quot;on&quot;, &quot;the&quot;, &quot;mat&quot;, &quot;because&quot;, &quot;it&quot;]
+    num_heads = 4
+
+    # 模拟不同头学到的模式
+    weights = torch.zeros(num_heads, seq_len, seq_len)
+
+    # Head 0: 主要关注前一个词（位置关系）
+    for i in range(seq_len):
+        if i &gt; 0:
+            weights[0, i, i-1] = 0.6
+        weights[0, i, i] = 0.4 if i &gt; 0 else 1.0
+
+    # Head 1: 主要关注名词
+    noun_positions = [1, 5]  # &quot;cat&quot;, &quot;mat&quot;
+    for i in range(seq_len):
+        total = 0
+        for np_pos in noun_positions:
+            if np_pos &lt;= i:
+                weights[1, i, np_pos] = 0.3
+                total += 0.3
+        weights[1, i, i] = 1.0 - total if total &lt; 1 else 0.1
+
+    # Head 2: 均匀关注所有可见 token
+    for i in range(seq_len):
+        for j in range(i+1):
+            weights[2, i, j] = 1.0 / (i+1)
+
+    # Head 3: &quot;it&quot; 强烈关注 &quot;cat&quot;（指代）
+    for i in range(seq_len):
+        weights[3, i, i] = 0.5
+        if i &gt; 0:
+            weights[3, i, 0:i] = 0.5 / i
+    weights[3, 7, 1] = 0.8  # &quot;it&quot; → &quot;cat&quot;
+    weights[3, 7, 7] = 0.1
+    weights[3, 7, 0] = 0.05
+    weights[3, 7, 2:7] = 0.05 / 5
+
+    # 画图
+    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+    head_names = [&quot;Head 0: 关注前一个词&quot;, &quot;Head 1: 关注名词&quot;,
+                  &quot;Head 2: 均匀分布&quot;, &quot;Head 3: 指代关系&quot;]
+
+    for idx, (ax, name) in enumerate(zip(axes.flat, head_names)):
+        w = weights[idx].numpy()
+        # 应用 causal mask
+        mask = np.triu(np.ones((seq_len, seq_len)), k=1)
+        w = w * (1 - mask)
+        # 重新归一化
+        row_sums = w.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1
+        w = w / row_sums
+
+        im = ax.imshow(w, cmap='Blues', vmin=0, vmax=1)
+        ax.set_xticks(range(seq_len))
+        ax.set_yticks(range(seq_len))
+        ax.set_xticklabels(tokens, rotation=45, ha='right')
+        ax.set_yticklabels(tokens)
+        ax.set_xlabel('Key (被关注)')
+        ax.set_ylabel('Query (在关注)')
+        ax.set_title(name)
+        plt.colorbar(im, ax=ax, fraction=0.046)
+
+    plt.tight_layout()
+    plt.savefig('multi_head_attention_patterns.png', dpi=100, bbox_inches='tight')
+    print(&quot;注意力模式图已保存: multi_head_attention_patterns.png&quot;)
+    print(&quot;\n观察:&quot;)
+    print(&quot;- 不同的头学到了完全不同的关注模式&quot;)
+    print(&quot;- Head 0 像一个'前看'模式&quot;)
+    print(&quot;- Head 1 专注于名词&quot;)
+    print(&quot;- Head 3 学会了指代消解 (it → cat)&quot;)
+
+visualize_attention()
+</code></pre>
+<hr />
+<h2 id="自测清单">自测清单</h2>
+<h3 id="qkv-相关">QKV 相关</h3>
+<ul>
+<li>[ ] 能用自己的话解释 Q、K、V 分别是什么（用图书馆/搜索引擎类比）</li>
+<li>[ ] 知道 QKV 是怎么从输入向量 x 算出来的（三个权重矩阵）</li>
+<li>[ ] 能手算一个 3×3 的 Attention（给定 QKV 和权重矩阵）</li>
+<li>[ ] 理解 Q×K^T 为什么能衡量"相关性"（点积 = 方向相似度）</li>
+<li>[ ] 知道为什么要除以 √d（防止 softmax 饱和）</li>
+<li>[ ] 理解 Causal Mask 的作用（不能看未来）</li>
+</ul>
+<h3 id="multi-head-相关">Multi-Head 相关</h3>
+<ul>
+<li>[ ] 知道为什么要多头（一个头只能学一种模式）</li>
+<li>[ ] 理解 hidden_dim = num_heads × head_dim 的维度关系</li>
+<li>[ ] 知道 Multi-Head 是用 reshape 实现的，不是真的切成多份</li>
+</ul>
+<h3 id="kv-cache-相关">KV Cache 相关</h3>
+<ul>
+<li>[ ] 能解释为什么 K 和 V 可以缓存（它们不会随后续 token 改变）</li>
+<li>[ ] 能解释为什么 Q 不需要缓存（只需要新 token 的 Q）</li>
+<li>[ ] 知道 Prefill 和 Decode 的区别</li>
+<li>[ ] 能手算 KV Cache 大小（给定模型配置和序列长度）</li>
+<li>[ ] 理解 GQA 如何减少 KV Cache（减少 KV heads 数量）</li>
+<li>[ ] 知道 Decode 为什么是 Memory Bound（向量×矩阵，大部分时间在读数据）</li>
+</ul>
+<h3 id="其他">其他</h3>
+<ul>
+<li>[ ] 知道 FFN 的作用和大致结构（SwiGLU）</li>
+<li>[ ] 知道残差连接为什么重要（梯度直通）</li>
+<li>[ ] 能画出完整 Transformer Block 的结构</li>
+</ul>
+<hr />
+<h2 id="延伸阅读">延伸阅读</h2>
+<table>
+<thead>
+<tr>
+<th>资源</th>
+<th>类型</th>
+<th>推荐度</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://jalammar.github.io/illustrated-transformer/">The Illustrated Transformer</a></td>
+<td>博客</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>最好的图解入门</td>
+</tr>
+<tr>
+<td><a href="https://www.youtube.com/watch?v=eMlx5fFNoYc">3Blue1Brown: Attention</a></td>
+<td>视频</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>动画直觉</td>
+</tr>
+<tr>
+<td><a href="https://www.youtube.com/watch?v=kCc8FmEb1nY">Andrej Karpathy: Let's build GPT</a></td>
+<td>视频</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>2 小时从零实现</td>
+</tr>
+<tr>
+<td><a href="https://kipp.ly/transformer-inference-arithmetic/">The KV Cache Explained</a></td>
+<td>博客</td>
+<td>⭐⭐⭐⭐</td>
+<td>推理算术详解</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a></td>
+<td>论文</td>
+<td>⭐⭐⭐</td>
+<td>原始论文（进阶再看）</td>
+</tr>
+<tr>
+<td><a href="https://arxiv.org/abs/2307.09288">Llama 2 Technical Report</a></td>
+<td>论文</td>
+<td>⭐⭐⭐⭐</td>
+<td>对照架构细节</td>
+</tr>
+<tr>
+<td><a href="https://github.com/karpathy/nanoGPT">nanoGPT</a></td>
+<td>代码</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>最简 GPT 实现</td>
+</tr>
+</tbody>
+</table></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+  </script>
+</body>
+</html>

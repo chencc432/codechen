@@ -21,12 +21,13 @@
 3. **日常操作**：如何用 `kubectl`、如何写 YAML、如何做常见运维
 4. **排障方法**：出现问题时应该先查哪里，再查哪里
 5. **进阶原理**：网络、存储、调度、安全、Ingress
-6. **编程扩展**：client-go、Informer、自定义控制器
+6. **编程扩展**：client-go 机制全景（Informer、WorkQueue、Discovery/Dynamic、Patch/SSA、选主等）、自定义控制器
 7. **平台扩展**：CRD、自定义控制器、Operator、资源设计与版本演进
 8. **存储运维**：卷、存储类、CSI、扩容、迁移、备份与恢复
 9. **工作流编排**：Argo Workflow（DAG/Steps、参数与制品、CronWorkflow、生产实践）
 10. **控制器深度**：Informer 内部、Workqueue、Reconcile、Leader Election、Finalizer 等
 11. **网络工程**：企业网络架构全景、VPC 与内网互通、公网暴露、办公网与堡垒机、网络转发与排障
+12. **AI Infra**：GPU 资源管理、RDMA 高性能网络、NUMA 拓扑感知、Gang Scheduling、NCCL 调优、训练集群规划
 
 ## 推荐学习方式
 
@@ -63,13 +64,17 @@
 
 适合想写自动化工具、Operator 或控制器的同学：
 
-1. [client-go 入门](./05-client-go/01-introduction.md)
-2. [客户端配置与连接](./05-client-go/02-client-setup.md)
-3. [资源的 CRUD 操作](./05-client-go/03-crud-operations.md)
-4. [Informer 机制详解](./05-client-go/04-informer.md)
-5. [实战项目：自定义控制器](./05-client-go/05-controller-demo.md)
-6. [Kubernetes 自定义资源专题](./07-custom-resources/README.md)
-7. [控制器深度专题](./11-controller-deep-dive/README.md)
+1. [client-go 模块总览](./05-client-go/README.md)
+2. [机制全景与入门](./05-client-go/01-introduction.md)
+3. [客户端配置与连接](./05-client-go/02-client-setup.md)
+4. [CRUD 与写路径机制](./05-client-go/03-crud-operations.md)
+5. [Informer 机制详解](./05-client-go/04-informer.md)
+6. [实战：自定义控制器](./05-client-go/05-controller-demo.md)
+7. [Discovery 与 Dynamic Client](./05-client-go/06-discovery-and-dynamic.md)
+8. [常用机制与工具包](./05-client-go/07-common-mechanisms.md)
+9. [排障与生产清单](./05-client-go/08-debugging-and-pitfalls.md)
+10. [Kubernetes 自定义资源专题](./07-custom-resources/README.md)
+11. [控制器深度专题](./11-controller-deep-dive/README.md)
 
 ### 路线 5：工作流与 Pipeline
 
@@ -83,6 +88,19 @@
 6. [WorkflowTemplate 与 CronWorkflow](./10-argo-workflow/06-workflowtemplate-and-cron.md)
 7. [架构与控制器原理](./10-argo-workflow/07-architecture-and-controller.md)
 8. [生产实践与故障排查](./10-argo-workflow/08-production-and-troubleshooting.md)
+
+
+### 路线 7：AI Infra 与训练平台
+
+适合需要在 Kubernetes 上部署 AI 训练/推理平台的同学：
+
+1. [AI Infra 在 Kubernetes 上的实践](./02-resources/10-ai-infra.md) - GPU 资源管理、RDMA 网络、Gang Scheduling、NCCL 调优
+2. [调度机制与策略](./04-advanced/03-scheduling.md) - 重点看 GPU 调度、PriorityClass、Gang Scheduling、Cluster Autoscaler
+3. [Kubernetes 网络模型](./04-advanced/01-networking.md) - 重点看 RDMA/InfiniBand 高性能网络部分
+4. [存储系统详解](./04-advanced/02-storage.md) - 训练数据存储和 checkpoint 策略
+5. [Argo Workflow 概述与核心概念](./10-argo-workflow/01-argo-overview.md) - ML Pipeline 编排
+6. [Volcano 官方文档](https://volcano.sh/) - 批处理调度增强
+7. [NVIDIA GPU Operator 文档](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/) - GPU 运维自动化
 
 ### 路线 6：GitOps 与渐进发布
 
@@ -128,6 +146,8 @@
 6. [Namespace - 资源隔离](./02-resources/06-namespace.md)
 7. [StatefulSet - 有状态应用](./02-resources/07-statefulset.md)
 8. [DaemonSet 与 Job](./02-resources/08-daemonset-job.md)
+9. [ServiceAccount 与 RBAC 权限控制](./02-resources/09-serviceaccount-rbac.md)
+10. [AI Infra 在 Kubernetes 上的实践](./02-resources/10-ai-infra.md)
 
 ### 第三部分：实战操作篇
 
@@ -150,13 +170,17 @@
 
 ### 第五部分：client-go 编程
 
-这部分解决的问题是："如果不用 kubectl，而是自己写程序访问 Kubernetes，该怎么做？"
+这部分解决的问题是："如果不用 kubectl，而是自己写程序访问 Kubernetes，该怎么做？Informer、WorkQueue、Discovery 等机制如何拼成控制器？"
 
-1. [client-go 入门](./05-client-go/01-introduction.md)
-2. [客户端配置与连接](./05-client-go/02-client-setup.md)
-3. [资源的 CRUD 操作](./05-client-go/03-crud-operations.md)
-4. [Informer 机制详解](./05-client-go/04-informer.md)
-5. [实战项目：自定义控制器](./05-client-go/05-controller-demo.md)
+1. [client-go 模块总览](./05-client-go/README.md)
+2. [机制全景与入门](./05-client-go/01-introduction.md)
+3. [客户端配置与连接](./05-client-go/02-client-setup.md)
+4. [CRUD 与写路径机制](./05-client-go/03-crud-operations.md)
+5. [Informer 机制详解](./05-client-go/04-informer.md)
+6. [实战：自定义控制器](./05-client-go/05-controller-demo.md)
+7. [Discovery 与 Dynamic Client](./05-client-go/06-discovery-and-dynamic.md)
+8. [常用机制与工具包](./05-client-go/07-common-mechanisms.md)
+9. [排障与生产清单](./05-client-go/08-debugging-and-pitfalls.md)
 
 ### 第六部分：实战项目
 
@@ -273,6 +297,7 @@
 |------|----------|------|
 | 基础理论篇 | `持续增强` | 已开始朝更细、更友好的讲解方式统一 |
 | 核心资源篇 | `持续增强` | 已有主体内容，后续会继续补字段解释、最佳实践、排障 |
+| AI Infra 篇 | `已补齐骨架` | 新增 AI Infra 专题，覆盖 GPU 管理、RDMA 网络、Gang Scheduling、NCCL 调优 |
 | 实战操作篇 | `持续增强` | 命令较全，后续会强化场景化使用方式 |
 | 进阶主题 | `已补齐骨架` | 已补全缺失章节入口，后续继续做深讲 |
 | client-go | `持续增强` | 基础到控制器链路已存在，后续补更多原理和实战说明 |
@@ -314,6 +339,8 @@
 第 6 周：Argo Workflow / 控制器深度专题
 第 7 周：网络工程专题（企业网络架构、VPC、公网暴露、堡垒机、网络转发与排障）
 第 8 周：Argo 全家桶专题（Argo CD、Argo Rollouts、Argo Events、全家桶联动）
+第 9 周：AI Infra 专题（GPU 资源管理、RDMA 高性能网络、NUMA 拓扑感知、Gang Scheduling）
+第 10 周：AI Infra 专题（训练集群规划、NCCL 调优、推理部署、监控与排障）
 ```
 
 如果你时间更碎片化，也可以按主题拆开学：

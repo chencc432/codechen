@@ -1,4 +1,8 @@
-# 📝 资源的 CRUD 操作
+# 资源的 CRUD 与写路径机制
+
+CRUD 是 client-go 的基本功，但生产代码里真正决定稳定性的往往是：**怎么改（Update / Patch / Apply）**、**冲突怎么重试**、**List 怎么分页**。本章先覆盖常见资源操作，再把这些机制讲透。
+
+读路径若要长期跟着变化走，不要停在本章末尾的裸 Watch；下一章 Informer 才是标准做法。
 
 ## Pod 操作
 
@@ -452,37 +456,201 @@ func CreateSecret(clientset *kubernetes.Clientset, namespace string) error {
 }
 ```
 
-## Watch 资源变化
+## 写路径机制：Update / Patch / Apply
+
+### 三种改法对比
+
+| 方式 | 提交内容 | 并发友好度 | 典型用途 |
+|------|----------|------------|----------|
+| **Update** | 整对象 | 低（易 409） | 逻辑简单、对象小 |
+| **Patch** | 变更片段 | 较高 | 改注解、改个别字段 |
+| **Apply（SSA）** | 声明式字段 + fieldManager | 高（按字段归属合并） | 多控制器共建同一对象 |
+
+Update 依赖对象里的 `resourceVersion` 做乐观锁：你读到的版本若已被别人改过，API Server 返回 `409 Conflict`。
+
+### Strategic Merge Patch / Merge Patch / JSON Patch
 
 ```go
-func WatchPods(clientset *kubernetes.Clientset, namespace string) error {
-    watcher, err := clientset.CoreV1().Pods(namespace).Watch(context.TODO(), metav1.ListOptions{})
-    if err != nil {
-        return err
-    }
-    defer watcher.Stop()
-    
-    fmt.Println("开始监听 Pod 变化...")
-    
-    for event := range watcher.ResultChan() {
-        pod, ok := event.Object.(*corev1.Pod)
-        if !ok {
-            continue
-        }
-        
-        switch event.Type {
-        case "ADDED":
-            fmt.Printf("[新增] Pod: %s\n", pod.Name)
-        case "MODIFIED":
-            fmt.Printf("[修改] Pod: %s, 状态: %s\n", pod.Name, pod.Status.Phase)
-        case "DELETED":
-            fmt.Printf("[删除] Pod: %s\n", pod.Name)
-        }
-    }
-    
-    return nil
+import (
+	"encoding/json"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+// Strategic Merge Patch：对内置资源最常用，懂 list 合并策略（如 containers 按 name 合并）
+func PatchPodAnnotation(clientset kubernetes.Interface, ns, name, key, value string) error {
+	patch := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]string{
+				key: value,
+			},
+		},
+	}
+	data, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	_, err = clientset.CoreV1().Pods(ns).Patch(
+		context.TODO(),
+		name,
+		types.StrategicMergePatchType,
+		data,
+		metav1.PatchOptions{},
+	)
+	return err
+}
+
+// JSON Patch：精确操作路径，适合删字段、改数组下标
+func JSONPatchReplicas(clientset kubernetes.Interface, ns, name string, replicas int32) error {
+	patch := []map[string]interface{}{
+		{"op": "replace", "path": "/spec/replicas", "value": replicas},
+	}
+	data, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	_, err = clientset.AppsV1().Deployments(ns).Patch(
+		context.TODO(),
+		name,
+		types.JSONPatchType,
+		data,
+		metav1.PatchOptions{},
+	)
+	return err
 }
 ```
+
+注意：CRD 默认通常**没有** strategic merge patch 策略，对 CR 更常用 Merge Patch、JSON Patch 或 SSA。
+
+### Server-Side Apply（SSA）
+
+SSA 让 API Server 记录「哪个 fieldManager 拥有哪些字段」。两个控制器改同一对象的不同字段可以共存；改同一字段会按强制/冲突规则处理。
+
+```go
+import (
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+func ApplyDeploymentLabels(clientset kubernetes.Interface, ns string, deploy *appsv1.Deployment) error {
+	force := true
+	_, err := clientset.AppsV1().Deployments(ns).Apply(
+		context.TODO(),
+		deploy, // 建议只填你拥有的字段；ApplyConfiguration 生成代码更稳妥
+		metav1.ApplyOptions{
+			FieldManager: "my-controller",
+			Force:        force, // 生产中 Force 要谨慎，先理解冲突再决定
+		},
+	)
+	return err
+}
+```
+
+Kubernetes 1.21+ 起 SSA 已是推荐的声明式写入方式之一；Controller Runtime / Kubebuilder 默认也偏向 SSA。
+
+### 冲突重试（RetryOnConflict）
+
+控制器里 Update 撞车是常态，不要把 409 当致命错误。
+
+```go
+import (
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+)
+
+func AddAnnotationWithRetry(clientset kubernetes.Interface, ns, name, key, value string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod, err := clientset.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		pod = pod.DeepCopy() // 若对象来自 Informer 缓存，必须拷贝
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		pod.Annotations[key] = value
+		_, err = clientset.CoreV1().Pods(ns).Update(context.TODO(), pod, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+func IsUselessToRetry(err error) bool {
+	return errors.IsNotFound(err) || errors.IsInvalid(err) || errors.IsForbidden(err)
+}
+```
+
+原则：
+
+1. 每次重试都**重新 Get**（或重新从缓存读再 DeepCopy）
+2. 不要修改 Lister 返回的原对象
+3. NotFound / Forbidden / Invalid 通常不应无限重试
+
+### List 分页（Continue + Limit）
+
+大集群一次 List 全量会拖垮 API Server 和客户端内存。用分页：
+
+```go
+func ListAllPodsPaged(clientset kubernetes.Interface, ns string) ([]corev1.Pod, error) {
+	var all []corev1.Pod
+	var continueToken string
+	for {
+		list, err := clientset.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+			Limit:    500,
+			Continue: continueToken,
+		})
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, list.Items...)
+		continueToken = list.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+	return all, nil
+}
+```
+
+Informer 内部的 Reflector 也会处理分块 List；你手写 List 工具时记得同样做。
+
+## Watch 只作理解，生产用 Informer
+
+裸 Watch 能帮你理解事件流，但连接断开、RV 过期（`410 Gone`）、重 List、本地查询都要自己扛。
+
+```go
+func WatchPods(clientset kubernetes.Interface, namespace string) error {
+	watcher, err := clientset.CoreV1().Pods(namespace).Watch(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	defer watcher.Stop()
+
+	for event := range watcher.ResultChan() {
+		pod, ok := event.Object.(*corev1.Pod)
+		if !ok {
+			continue
+		}
+		switch event.Type {
+		case watch.Added:
+			fmt.Printf("[新增] %s\n", pod.Name)
+		case watch.Modified:
+			fmt.Printf("[修改] %s (%s)\n", pod.Name, pod.Status.Phase)
+		case watch.Deleted:
+			fmt.Printf("[删除] %s\n", pod.Name)
+		case watch.Bookmark:
+			// 用于推进 resourceVersion，通常可忽略业务处理
+		case watch.Error:
+			return fmt.Errorf("watch error: %v", event.Object)
+		}
+	}
+	return nil
+}
+```
+
+长期运行请直接看 [Informer 机制详解](./04-informer.md)。
 
 ## 完整示例程序
 
@@ -621,7 +789,7 @@ func cleanup(clientset *kubernetes.Clientset, namespace string) {
 
 ## 下一步
 
-- [Informer 机制详解](./04-informer.md)
+- [Informer 机制详解](./04-informer.md) — List/Watch 地基、缓存、WorkQueue
 
 
 

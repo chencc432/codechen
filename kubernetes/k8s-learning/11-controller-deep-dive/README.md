@@ -1,6 +1,6 @@
 # 🎛️ Controller 深度专题
 
-> 这个专题在 [client-go 入门](../05-client-go/README.md) 和 [自定义资源专题](../07-custom-resources/README.md) 之上更深入一层。
+> 这个专题在 [client-go 编程模块](../05-client-go/README.md) 和 [自定义资源专题](../07-custom-resources/README.md) 之上更深入一层。
 > 目标：让你不仅会"写一个 Reconcile"，还能讲清楚 Informer 内部数据结构、Workqueue 限速、Leader Election、Finalizer 时序、controller-runtime 与原生 client-go 的取舍，以及生产环境的常见坑。
 
 ## 这个专题适合谁
